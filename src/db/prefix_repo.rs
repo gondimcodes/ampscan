@@ -20,6 +20,11 @@ fn row_to_prefix(row: &rusqlite::Row) -> rusqlite::Result<Prefix> {
 /// Insert a new network prefix.
 /// Automatically detects IPv4 vs IPv6 from the prefix string.
 pub fn insert_prefix(conn: &DbConn, prefix: &str, description: &str) -> Result<i64> {
+    // Security check: limit description length to prevent memory exhaustion
+    if description.chars().count() > 255 {
+        anyhow::bail!("Description is too long (maximum 255 characters allowed).");
+    }
+
     // Validate and detect IP version
     let net: ipnet::IpNet = prefix
         .parse()
@@ -120,6 +125,9 @@ pub fn update_prefix(
         )?;
     }
     if let Some(desc) = description {
+        if desc.chars().count() > 255 {
+            anyhow::bail!("Description is too long (maximum 255 characters allowed).");
+        }
         let conn = conn.lock().unwrap();
         conn.execute(
             "UPDATE prefixes SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
