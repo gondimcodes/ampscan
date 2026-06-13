@@ -1,19 +1,18 @@
-# Configuração do Relatório PDF do AmpScan
+# AmpScan PDF Report Configuration
 
 [company]
-# Nome da empresa que gera o relatório
-name = "ISPFocus Serviços e Tecnologia"
+# Name of the company generating the report
+name = "XXXXXXXX XXXXXXXX X XXXXXXXXXX"
 
-# CNPJ da empresa emissora
-cnpj = "62.789.740/0001-06"
+# Company Registration Number (e.g., CNPJ, EIN, VAT)
+cnpj = "XX.XXX.XXX/XXXX-XX"
 
-# Endereço da empresa emissora
-address = "Av. Litorânea, 320 - C1 - Centro - Araruama - RJ - CEP: 28979-063"
+# Address of the issuing company
+address = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
-# Caminho para a imagem de logo (PNG ou JPEG).
-# Se não for configurada ou o arquivo não existir, será desenhado um cabeçalho padrão em texto.
-logo_path = "logo.png"
+# Path to the logo image (PNG or JPEG).
+# If not configured or the file does not exist, a default text header will be drawn.
+logo_path = ""
 
-# Escala/tamanho do logotipo no PDF (ex: 0.15 é o padrão, valores maiores como 0.25 aumentam a imagem)
+# Logo scale/size in the PDF (e.g., 0.15 is default, higher values like 0.25 increase the image)
 logo_scale = 0.50
-
