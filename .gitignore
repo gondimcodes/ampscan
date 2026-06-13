@@ -3,3 +3,6 @@
 /ampscan.db-shm
 /ampscan.db-wal
 /test_ampscan.db
+/logo.png
+/config.toml_ispfocus
+/config.toml.sample
