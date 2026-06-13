@@ -377,15 +377,10 @@ pub fn generate_pdf(
             false,
         );
     }
-    w.text(
-        &format!(
-            "Scanned prefixes: {}",
-            report.prefixes_scanned.join(", ")
-        ),
-        BODY_SIZE,
-        BODY_LH,
-        false,
-    );
+    let prefixes_text = format!("Scanned prefixes: {}", report.prefixes_scanned.join(", "));
+    for line in wrap_text(&prefixes_text, 90) {
+        w.text(&line, BODY_SIZE, BODY_LH, false);
+    }
     w.text(
         &format!("Total tested IPs: {}", report.total_ips),
         BODY_SIZE,
