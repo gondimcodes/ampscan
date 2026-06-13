@@ -408,7 +408,7 @@ fn cmd_port(db: &DbConn, cmd: &PortCommands) -> Result<()> {
                     Cell::new(&p.name),
                     Cell::new(&p.probe_type),
                     status,
-                    Cell::new(truncate(&p.description, 50)),
+                    Cell::new(&p.description),
                 ]);
             }
             println!("{}", table);
@@ -464,7 +464,7 @@ fn cmd_prefix(db: &DbConn, cmd: &PrefixCommands) -> Result<()> {
                     Cell::new(&p.prefix),
                     Cell::new(format!("v{}", p.ip_version)),
                     status,
-                    Cell::new(truncate(&p.description, 50)),
+                    Cell::new(&p.description),
                 ]);
             }
             println!("{}", table);
