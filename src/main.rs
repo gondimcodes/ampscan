@@ -255,6 +255,11 @@ async fn main() -> Result<()> {
 
 /// Open the database and authenticate the user.
 fn open_and_auth(cli: &Cli) -> Result<DbConn> {
+    // Ensure database file exists before trying to open it
+    if !std::path::Path::new(&cli.db_path).exists() {
+        anyhow::bail!("Database not initialized. Run 'ampscan init' first.");
+    }
+
     let key = db::get_db_key()?;
     let db = db::open_database(&cli.db_path, &key)?;
 
@@ -315,6 +320,14 @@ async fn cmd_init(cli: &Cli) -> Result<()> {
     let key = db::get_db_key()?;
 
     println!("{}", "Initializing database...".cyan());
+
+    // If database files already exist, remove them to allow fresh initialization
+    if std::path::Path::new(&cli.db_path).exists() {
+        let _ = std::fs::remove_file(&cli.db_path);
+        let _ = std::fs::remove_file(format!("{}-wal", cli.db_path));
+        let _ = std::fs::remove_file(format!("{}-shm", cli.db_path));
+    }
+
     let db = db::open_database(&cli.db_path, &key)?;
 
     // Seed default ports
