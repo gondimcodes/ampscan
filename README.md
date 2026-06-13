@@ -85,6 +85,7 @@ Allows you to manage which ports and payloads will be tested during the scan:
     ```bash
     ./target/release/ampscan port list
     ```
+    ![Port List Output](ampscan_port_list.png)
 *   **Disable / Enable a specific port:**
     ```bash
     ./target/release/ampscan port disable <ID>
@@ -98,6 +99,7 @@ Defines the targets for batch scanning (accepts IPv4 and IPv6 ranges):
     ```bash
     ./target/release/ampscan prefix list
     ```
+    ![Prefix List Output](ampscan_prefix_list.png)
 *   **Add:**
     ```bash
     ./target/release/ampscan prefix add --prefix "2001:db8::/120" --description "IPv6 Staging Hosts"
@@ -137,6 +139,7 @@ Robust execution example:
 ```bash
 ./target/release/ampscan scan run --concurrency 500 --timeout 2 --output scan_june.pdf
 ```
+![Scan Run CLI Output](ampscan_report_cli.png)
 
 Example with manual prefix:
 ```bash
