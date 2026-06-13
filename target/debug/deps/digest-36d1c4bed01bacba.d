@@ -1,0 +1,12 @@
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/digest-36d1c4bed01bacba.d: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/ct_variable.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/rt_variable.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/wrapper.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/xof_reader.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/digest.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/mac.rs
+
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/libdigest-36d1c4bed01bacba.rmeta: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/ct_variable.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/rt_variable.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/wrapper.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/xof_reader.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/digest.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/mac.rs
+
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/lib.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/ct_variable.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/rt_variable.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/wrapper.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/core_api/xof_reader.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/digest.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/mac.rs:

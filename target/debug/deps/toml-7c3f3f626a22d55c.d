@@ -1,0 +1,18 @@
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/toml-7c3f3f626a22d55c.d: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/map.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/value.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/de.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/mod.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/array.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/map.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/mod.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/array.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/map.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/macros.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/edit.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/fmt.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/table.rs
+
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/libtoml-7c3f3f626a22d55c.rmeta: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/map.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/value.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/de.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/mod.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/array.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/map.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/mod.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/array.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/map.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/macros.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/edit.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/fmt.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/table.rs
+
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/lib.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/map.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/value.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/de.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/mod.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/array.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/map.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/mod.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/array.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/ser/ser_value/map.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/macros.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/edit.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/fmt.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.23/src/table.rs:
