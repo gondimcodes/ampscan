@@ -1,5 +1,0 @@
-/home/gondim/projetos/ampscan/target/debug/build/rustix-10b2cb0ac2006eb5/build_script_build-10b2cb0ac2006eb5.d: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.4/build.rs
-
-/home/gondim/projetos/ampscan/target/debug/build/rustix-10b2cb0ac2006eb5/build_script_build-10b2cb0ac2006eb5: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.4/build.rs
-
-/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.4/build.rs:
