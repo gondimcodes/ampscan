@@ -24,7 +24,7 @@ sudo apt install build-essential libsqlite3-dev
 
 1. Clone your project repository or navigate to the source directory:
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/gondimcodes/ampscan
 cd ampscan
 ```
 
