@@ -1,0 +1,5 @@
+/target
+/ampscan.db
+/ampscan.db-shm
+/ampscan.db-wal
+/test_ampscan.db
