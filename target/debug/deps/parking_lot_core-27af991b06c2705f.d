@@ -1,0 +1,11 @@
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/parking_lot_core-27af991b06c2705f.d: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/parking_lot.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/spinwait.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/thread_parker/mod.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/util.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/word_lock.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/thread_parker/linux.rs
+
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/libparking_lot_core-27af991b06c2705f.rmeta: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/parking_lot.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/spinwait.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/thread_parker/mod.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/util.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/word_lock.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/thread_parker/linux.rs
+
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/lib.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/parking_lot.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/spinwait.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/thread_parker/mod.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/util.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/word_lock.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot_core-0.9.12/src/thread_parker/linux.rs:

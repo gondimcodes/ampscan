@@ -1,0 +1,13 @@
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/half-42f3eac262529664.d: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/bfloat.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/bfloat/convert.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16/arch.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16/arch/x86.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/leading_zeros.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/slice.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/vec.rs
+
+/home/gondim/projetos/amplification_port_testing/target/debug/deps/libhalf-42f3eac262529664.rmeta: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/bfloat.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/bfloat/convert.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16/arch.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16/arch/x86.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/leading_zeros.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/slice.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/vec.rs
+
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/lib.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/bfloat.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/bfloat/convert.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16/arch.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/binary16/arch/x86.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/leading_zeros.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/slice.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/half-2.7.1/src/vec.rs:
