@@ -771,6 +771,7 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
 }
 
 /// Truncate a string for table display.
+#[allow(dead_code)]
 fn truncate(s: &str, max_len: usize) -> String {
     if s.chars().count() <= max_len {
         s.to_string()
