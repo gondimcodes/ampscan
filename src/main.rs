@@ -652,8 +652,8 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                             Cell::new("Vulnerable").fg(Color::Red),
                         ),
                         scanner::result::PortStatus::OpenProtected => (
-                            Cell::new(r.ip.to_string()).fg(Color::Green),
-                            Cell::new("Protected").fg(Color::Green),
+                            Cell::new(r.ip.to_string()).fg(Color::Yellow),
+                            Cell::new("Protected").fg(Color::Yellow),
                         ),
                         _ => (Cell::new(r.ip.to_string()), Cell::new("")),
                     };
