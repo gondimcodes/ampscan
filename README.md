@@ -1,158 +1,150 @@
-# AmpScan — Manual de Uso e Guia do Usuário
+# AmpScan — Usage Manual and User Guide
 
-O **AmpScan** é uma ferramenta de linha de comando (CLI) escrita em Rust de alta performance projetada para auditar redes e identificar portas abertas e mal configuradas que possam ser exploradas em ataques de **amplificação DDoS** sobre protocolos IPv4 e IPv6.
+**AmpScan** is a high-performance command-line (CLI) tool written in Rust, designed to audit networks and identify open and misconfigured ports that could be exploited in **DDoS amplification** attacks across IPv4 and IPv6 protocols.
 
 ---
 
-## 🔒 Segurança em Primeiro Lugar
+## 🔒 Security First
 
-O AmpScan foi desenhado com segurança em repouso. O banco de dados SQLite local (`ampscan.db`) é **completamente criptografado usando SQLCipher (AES-256)**.
+AmpScan was designed with security at rest in mind. The local SQLite database (`ampscan.db`) is **completely encrypted using SQLCipher (AES-256)**.
 
-### Variáveis de Ambiente Cruciais
+### Crucial Environment Variables
 
-Antes de rodar qualquer subcomando, você deve definir as seguintes variáveis no seu ambiente:
+Before running any subcommand, you must define the following variables in your environment:
 
-*   `AMPSCAN_DB_KEY`: **[Obrigatória]** A chave secreta usada para criptografar/descriptografar o banco de dados (recomenda-se uma string longa com mais de 32 caracteres).
-*   `AMPSCAN_DB_PATH`: *(Opcional)* Caminho personalizado para o banco de dados (padrão: `ampscan.db`).
-*   `AMPSCAN_USER`: *(Opcional)* Define o usuário administrador para evitar que o terminal pergunte o username de forma interativa a cada comando.
+*   `AMPSCAN_DB_KEY`: **[Required]** The secret key used to encrypt/decrypt the database (a long string with more than 32 characters is recommended).
+*   `AMPSCAN_DB_PATH`: *(Optional)* Custom path for the database file (default: `ampscan.db`).
+*   `AMPSCAN_USER`: *(Optional)* Defines the administrator user to prevent the terminal from interactively prompting for the username on each command.
 
-Exemplo de preparação do ambiente:
+Environment preparation example:
 ```bash
-export AMPSCAN_DB_KEY="uma_chave_secreta_muito_segura_e_longa_para_o_banco"
+export AMPSCAN_DB_KEY="a_very_secure_and_long_secret_key_for_the_db"
 export AMPSCAN_USER="admin"
 ```
 
 ---
 
-## 🛠️ Instalação e Compilação
+## 🛠️ Installation and Compilation
 
-Para compilar o projeto em sua máquina (requer o conjunto de ferramentas do Rust / Cargo instalado):
+To compile the project on your machine (requires the Rust / Cargo toolchain installed):
 
 ```bash
-# Clone o repositório ou navegue até a pasta
-cd amplification_port_testing
+# Clone the repository or navigate to the folder
+cd ampscan
 
-# Compile em modo Release para máxima performance de scanning
+# Compile in Release mode for maximum scanning performance
 cargo build --release
 ```
 
-O binário compilado estará localizado em `target/release/ampscan`.
+The compiled binary will be located at `target/release/ampscan`.
 
 ---
 
-## 🧭 Fluxo de Utilização Rápido (Quick Start)
+## 🧭 Quick Start Workflow
 
-### 1. Inicializar o Banco de Dados
-Na primeira execução, inicialize o banco para criar o esquema criptografado, registrar as 20 portas padrão e configurar a senha do usuário administrador inicial:
+### 1. Initialize the Database
+On the first run, initialize the database to create the encrypted schema, register the 20 default ports, and configure the initial administrator user password:
 
 ```bash
 ./target/release/ampscan init
 ```
-*Digite o nome de usuário desejado e defina uma senha forte quando solicitado interativamente.*
+*Enter the desired username and set a strong password when prompted interactively.*
 
-### 2. Cadastrar um Prefixo de Rede (CIDR)
-Para que o escaneamento completo funcione, você precisa cadastrar quais prefixos de rede de sua propriedade/responsabilidade serão testados:
+### 2. Register a Network Prefix (CIDR)
+For full scanning to work, you need to register which network prefixes you own/manage to be tested:
 
 ```bash
-./target/release/ampscan prefix add --prefix "192.168.1.0/24" --description "Rede Corporativa Escritorio"
+./target/release/ampscan prefix add --prefix "192.168.1.0/24" --description "Corporate Office Network"
 ```
 
-### 3. Listar Portas Cadastradas
-Verifique as portas de amplificação registradas no sistema:
+### 3. List Registered Ports
+Check the amplification ports registered in the system:
 
 ```bash
 ./target/release/ampscan port list
 ```
 
-### 4. Executar o Scan Completo
-Rode o escaneamento paralelo em todos os prefixos ativos e gere o relatório em PDF:
+### 4. Run a Full Scan
+Run the parallel scan on all active prefixes and generate the PDF report:
 
 ```bash
-./target/release/ampscan scan run --concurrency 512 --output relatorio_seguranca.pdf
+./target/release/ampscan scan run --concurrency 512 --output security_report.pdf
 ```
 
 ---
 
-## 📖 Referência de Comandos da CLI
+## 📖 CLI Command Reference
 
 ### `ampscan init`
-Inicializa a estrutura do banco criptografado, popula com as 20 portas padrão de amplificação e cria o usuário master do sistema.
+Initializes the encrypted database structure, populates it with the 20 default amplification ports, and creates the system's master user.
 
-### Gerenciamento de Portas (`port`)
-Permite gerenciar quais portas e payloads serão testados durante a varredura:
+### Port Management (`port`)
+Allows you to manage which ports and payloads will be tested during the scan:
 
-*   **Listar:**
+*   **List:**
     ```bash
     ./target/release/ampscan port list
     ```
-*   **Adicionar porta customizada (UDP):**
-    ```bash
-    ./target/release/ampscan port add --port 12345 --proto udp --name "CUSTOM-UDP" --description "Serviço interno UDP" --probe-type udp_payload --payload-hex "FF00AA55"
-    ```
-*   **Desabilitar / Habilitar uma porta específica:**
+*   **Disable / Enable a specific port:**
     ```bash
     ./target/release/ampscan port disable <ID>
     ./target/release/ampscan port enable <ID>
     ```
-*   **Remover porta:**
-    ```bash
-    ./target/release/ampscan port remove <ID>
-    ```
 
-### Gerenciamento de Prefixos (`prefix`)
-Define os alvos dos escaneamentos em lote (aceita faixas IPv4 e IPv6):
+### Prefix Management (`prefix`)
+Defines the targets for batch scanning (accepts IPv4 and IPv6 ranges):
 
-*   **Listar:**
+*   **List:**
     ```bash
     ./target/release/ampscan prefix list
     ```
-*   **Adicionar:**
+*   **Add:**
     ```bash
-    ./target/release/ampscan prefix add --prefix "2001:db8::/120" --description "Hosts IPv6 Homologação"
+    ./target/release/ampscan prefix add --prefix "2001:db8::/120" --description "IPv6 Staging Hosts"
     ```
-*   **Desabilitar / Habilitar:**
+*   **Disable / Enable:**
     ```bash
     ./target/release/ampscan prefix disable <ID>
     ./target/release/ampscan prefix enable <ID>
     ```
 
-### Gerenciamento de Usuários (`user`)
-*   **Adicionar novo administrador:**
+### User Management (`user`)
+*   **Add new administrator:**
     ```bash
-    ./target/release/ampscan user add --username novo_admin
+    ./target/release/ampscan user add --username new_admin
     ```
-*   **Alterar senha:**
+*   **Change password:**
     ```bash
     ./target/release/ampscan user change-password --username admin
     ```
 
-### Execução de Scans (`scan`)
+### Running Scans (`scan`)
 
-O AmpScan possui dois modos de execução:
+AmpScan has two execution modes:
 
-#### 1. Modo Scan Lote (`scan run`)
-Busca todos os prefixos e portas marcados como ativos (`enabled`) no banco de dados e realiza testes de alcance paralelos.
+#### 1. Batch Scan Mode (`scan run`)
+Fetches all prefixes and ports marked as active (`enabled`) in the database and performs parallel reachability tests.
 
-**Parâmetros suportados:**
-*   `--concurrency <N>`: Número de probes enviados simultaneamente (padrão: `256`).
-*   `--timeout <S>`: Tempo limite de espera para resposta de cada probe em segundos (padrão: `3`).
-*   `--output <PATH>`: Nome do arquivo PDF a ser gerado (padrão: `ampscan_report.pdf`).
-*   `--no-icmp`: Desativa a validação prévia de ping (ICMP) por host. Útil caso você esteja executando sem privilégios de `root` ou permissão `CAP_NET_RAW` no Linux.
-    *   *Nota:* Com `--no-icmp` ativo, fallbacks locais (TCP handshakes) são tentados para saber se o host está online, e o status "Inconclusivo" não será retornado.
-*   `--prefix <CIDR>`: Prefixo de rede manual a ser varrido (ex: `192.168.1.0/24`). **Ignora os prefixos configurados no banco de dados e pula a geração do relatório PDF**.
+**Supported parameters:**
+*   `--concurrency <N>`: Number of probes sent simultaneously (default: `256`).
+*   `--timeout <S>`: Timeout for each probe's response in seconds (default: `3`).
+*   `--output <PATH>`: Name of the PDF file to be generated (default: `ampscan_report.pdf`).
+*   `--no-icmp`: Disables pre-host ping validation (ICMP). Useful if you are running without `root` privileges or `CAP_NET_RAW` permission on Linux.
+    *   *Note:* With `--no-icmp` active, local fallbacks (TCP handshakes) are attempted to check if the host is online, and the "Inconclusive" status will not be returned.
+*   `--prefix <CIDR>`: Manual network prefix to scan (e.g.: `192.168.1.0/24`). **Ignores database-configured prefixes and skips PDF report generation**.
 
-Exemplo de execução robusta:
+Robust execution example:
 ```bash
-./target/release/ampscan scan run --concurrency 500 --timeout 2 --output scan_junho.pdf
+./target/release/ampscan scan run --concurrency 500 --timeout 2 --output scan_june.pdf
 ```
 
-Exemplo com prefixo manual:
+Example with manual prefix:
 ```bash
 ./target/release/ampscan scan run --prefix "10.0.0.0/29" --no-icmp
 ```
 
-#### 2. Modo Único IP (`scan single`)
-Testa todas as portas ativas contra um único IP de destino, imprimindo as respostas e tempos em tempo real no console:
+#### 2. Single IP Mode (`scan single`)
+Tests all active ports against a single destination IP, printing real-time responses and timings to the console:
 
 ```bash
 ./target/release/ampscan scan single 1.1.1.1 --timeout 2 --no-icmp
@@ -160,11 +152,11 @@ Testa todas as portas ativas contra um único IP de destino, imprimindo as respo
 
 ---
 
-## 📈 Entendendo os Resultados
+## 📈 Understanding the Results
 
-Durante a varredura de cada porta, o status pode ser classificado como:
+During each port scan, the status can be classified as:
 
-1.  🔴 **Aberta (Vulnerável):** O alvo respondeu ao probe enviado. Significa que a porta de amplificação está aberta e responde publicamente a requisições externas sem filtragem.
-2.  🟢 **Fechada:** O host respondeu ao ping ICMP ou conexão TCP, mas o serviço de amplificação na porta indicada não deu resposta.
-3.  🔵 **Inconclusiva:** O host testado não respondeu ao ping ICMP ou probe, o que sugere que o host pode estar offline ou bloqueando tráfego de diagnóstico inteiramente.
-4.  🟡 **Erro:** Um erro interno de rede local ou timeout estrito ocorreu ao tentar a conexão.
+1.  🔴 **Open (Vulnerable):** The target responded to the sent probe. It means the amplification port is open and publicly responds to external requests without filtering.
+2.  🟢 **Closed:** The host responded to the ICMP ping or TCP connection, but the amplification service on the indicated port yielded no response.
+3.  🔵 **Inconclusive:** The tested host did not respond to the ICMP ping or probe, suggesting the host might be offline or entirely blocking diagnostic traffic.
+4.  🟡 **Protected:** The port is open, but it is not vulnerable.

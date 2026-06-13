@@ -1,1 +1,0 @@
-<ImageBuffer<Rgba<u8>, Vec<u8>> as GenericImageView>::Pixel == Rgb<u8>
