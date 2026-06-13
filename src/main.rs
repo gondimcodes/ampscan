@@ -716,7 +716,7 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                         format!("{}", "Open".red().bold())
                     }
                     scanner::result::PortStatus::OpenProtected => {
-                        format!("{}", "Open".yellow().bold())
+                        format!("{}", "Open/Protected".yellow().bold())
                     }
                     scanner::result::PortStatus::Closed => {
                         format!("{}", "Closed".green())
