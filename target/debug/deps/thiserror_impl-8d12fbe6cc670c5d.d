@@ -1,0 +1,14 @@
+/home/gondim/projetos/ampscan/target/debug/deps/thiserror_impl-8d12fbe6cc670c5d.d: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/ast.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/attr.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/expand.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/fmt.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/generics.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/prop.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/scan_expr.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/span.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/valid.rs
+
+/home/gondim/projetos/ampscan/target/debug/deps/libthiserror_impl-8d12fbe6cc670c5d.so: /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/lib.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/ast.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/attr.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/expand.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/fmt.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/generics.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/prop.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/scan_expr.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/span.rs /opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/valid.rs
+
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/lib.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/ast.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/attr.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/expand.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/fmt.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/generics.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/prop.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/scan_expr.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/span.rs:
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-1.0.69/src/valid.rs:
