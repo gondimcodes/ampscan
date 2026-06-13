@@ -213,6 +213,7 @@ fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
 }
 
 /// Truncate a string for display.
+#[allow(dead_code)]
 fn truncate(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         s.to_string()
@@ -534,14 +535,24 @@ pub fn generate_pdf(
             .collect();
 
         for r in &ip_results {
-            let line = format!(
-                "  * {}/{} ({}) - {}",
+            let prefix = format!(
+                "  * {}/{} ({}) - ",
                 r.port,
                 r.protocol.to_uppercase(),
-                r.service_name,
-                truncate(&r.description, 80)
+                r.service_name
             );
-            w.text(&line, SMALL_SIZE, SMALL_LH, false);
+            // Wrap description dynamically to fit the page width (~115 chars max for SMALL_SIZE)
+            let desc_width = 115usize.saturating_sub(prefix.len()).max(40);
+            let desc_lines = wrap_text(&r.description, desc_width);
+
+            if let Some(first) = desc_lines.first() {
+                w.text(&format!("{}{}", prefix, first), SMALL_SIZE, SMALL_LH, false);
+            }
+
+            let indent = " ".repeat(prefix.len());
+            for line in desc_lines.iter().skip(1) {
+                w.text(&format!("{}{}", indent, line), SMALL_SIZE, SMALL_LH, false);
+            }
         }
     }
 

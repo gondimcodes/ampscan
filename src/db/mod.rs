@@ -74,6 +74,17 @@ fn run_migrations(conn: &DbConn) -> Result<()> {
         ",
     )
     .context("Failed to run database migrations")?;
+
+    // Fix old truncated descriptions from previous database seeding
+    let _ = conn.execute(
+        "UPDATE ports SET description = ?1 WHERE port = 161 AND protocol = 'udp'",
+        rusqlite::params!["Simple Network Management Protocol - 'public' community exposes data and amplifies up to 6.3x"],
+    );
+    let _ = conn.execute(
+        "UPDATE ports SET description = ?1 WHERE port = 137 AND protocol = 'udp'",
+        rusqlite::params!["NetBIOS Name Service - exposure reveals network information and allows amplification"],
+    );
+
     Ok(())
 }
 
