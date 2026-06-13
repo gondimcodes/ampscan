@@ -80,7 +80,7 @@ pub fn get_enabled_prefixes(conn: &DbConn) -> Result<Vec<Prefix>> {
     let conn = conn.lock().unwrap();
     let mut stmt = conn
         .prepare(&format!(
-            "SELECT {} FROM prefixes WHERE enabled = 1 ORDER BY ip_version, prefix",
+            "SELECT {} FROM prefixes WHERE enabled != 0 ORDER BY ip_version, prefix",
             SELECT_COLS
         ))
         .context("Failed to prepare enabled prefixes query")?;
@@ -94,9 +94,10 @@ pub fn get_enabled_prefixes(conn: &DbConn) -> Result<Vec<Prefix>> {
 /// Enable or disable a prefix by id.
 pub fn toggle_prefix(conn: &DbConn, id: i64, enabled: bool) -> Result<()> {
     let conn = conn.lock().unwrap();
+    let val = if enabled { 1 } else { 0 };
     let rows = conn.execute(
         "UPDATE prefixes SET enabled = ?1, updated_at = datetime('now') WHERE id = ?2",
-        rusqlite::params![enabled as i64, id],
+        rusqlite::params![val, id],
     )?;
     if rows == 0 {
         anyhow::bail!("Prefix with id {} not found", id);
