@@ -1,0 +1,56 @@
+[package]
+name = "ampscan"
+version = "1.0.0"
+edition = "2021"
+description = "DDoS Amplification Port Testing Tool"
+authors = ["AmpScan"]
+
+[dependencies]
+# CLI framework
+clap = { version = "4", features = ["derive", "env"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Encrypted database (SQLCipher = AES-256)
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
+
+# Password hashing (Argon2id)
+argon2 = "0.5"
+
+# IP prefix/CIDR handling
+ipnet = "2"
+
+# PDF report generation (low-level, built-in fonts, zero external deps)
+printpdf = { version = "0.7", features = ["embedded_images"] }
+image = "0.24"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+
+# Error handling
+anyhow = "1"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Random number generation
+rand = "0.8"
+
+# Colored terminal output
+colored = "2"
+
+# ICMP ping (reachability check)
+surge-ping = "0.8"
+
+# Secure password input (no echo)
+rpassword = "7"
+
+# UUID for scan identifiers
+uuid = { version = "1", features = ["v4"] }
+
+# Terminal table formatting
+comfy-table = "7"
