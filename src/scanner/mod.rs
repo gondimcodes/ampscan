@@ -50,9 +50,11 @@ pub async fn run_scan(
 
         // Prevent memory exhaustion/panic on very large prefix ranges
         let max_hosts = 65536;
-        match net {
+        let hosts: Vec<IpAddr> = match net {
             IpNet::V4(net4) => {
-                let hosts_count = net4.hosts().count();
+                let start: u32 = net4.network().into();
+                let end: u32 = net4.broadcast().into();
+                let hosts_count = (end as u64 - start as u64 + 1) as usize;
                 if hosts_count > max_hosts {
                     anyhow::bail!(
                         "IPv4 prefix {} is too large to scan ({} hosts). The maximum allowed is {} hosts per prefix (e.g., /16).",
@@ -61,6 +63,9 @@ pub async fn run_scan(
                         max_hosts
                     );
                 }
+                (start..=end)
+                    .map(|ip_u32| IpAddr::V4(std::net::Ipv4Addr::from(ip_u32)))
+                    .collect()
             }
             IpNet::V6(net6) => {
                 if net6.prefix_len() < 112 {
@@ -70,10 +75,9 @@ pub async fn run_scan(
                         net6.prefix_len()
                     );
                 }
+                net6.hosts().map(IpAddr::V6).collect()
             }
-        }
-
-        let hosts: Vec<IpAddr> = net.hosts().collect();
+        };
         all_ips.extend(hosts);
     }
 
@@ -249,3 +253,54 @@ pub async fn scan_single_ip(
 
     Ok(results)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ipnet::IpNet;
+
+    #[test]
+    fn test_ipv4_prefix_expansion_includes_network_and_broadcast() {
+        let prefix_str = "192.168.1.0/24";
+        let net: IpNet = prefix_str.parse().unwrap();
+        let hosts: Vec<IpAddr> = match net {
+            IpNet::V4(net4) => {
+                let start: u32 = net4.network().into();
+                let end: u32 = net4.broadcast().into();
+                (start..=end)
+                    .map(|ip_u32| IpAddr::V4(std::net::Ipv4Addr::from(ip_u32)))
+                    .collect()
+            }
+            IpNet::V6(net6) => {
+                net6.hosts().map(IpAddr::V6).collect()
+            }
+        };
+
+        assert_eq!(hosts.len(), 256);
+        assert_eq!(hosts[0], "192.168.1.0".parse::<IpAddr>().unwrap());
+        assert_eq!(hosts[255], "192.168.1.255".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn test_ipv6_prefix_expansion_includes_all() {
+        let prefix_str = "fd00::/126";
+        let net: IpNet = prefix_str.parse().unwrap();
+        let hosts: Vec<IpAddr> = match net {
+            IpNet::V4(net4) => {
+                let start: u32 = net4.network().into();
+                let end: u32 = net4.broadcast().into();
+                (start..=end)
+                    .map(|ip_u32| IpAddr::V4(std::net::Ipv4Addr::from(ip_u32)))
+                    .collect()
+            }
+            IpNet::V6(net6) => {
+                net6.hosts().map(IpAddr::V6).collect()
+            }
+        };
+
+        assert_eq!(hosts.len(), 4);
+        assert_eq!(hosts[0], "fd00::".parse::<IpAddr>().unwrap());
+        assert_eq!(hosts[3], "fd00::3".parse::<IpAddr>().unwrap());
+    }
+}
+
