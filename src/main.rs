@@ -610,13 +610,13 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                 }
             };
 
-            println!("\n{} Starting scan...", "▶".cyan().bold());
+            println!("\n{} Starting scan...", "🌐".cyan().bold());
             println!(
                 "  Enabled ports: {} | Prefixes: {} | Concurrency: {} | Timeout: {}s",
-                ports.len(),
-                prefixes.len(),
-                concurrency,
-                timeout
+                ports.len().to_string().bold(),
+                prefixes.len().to_string().bold(),
+                concurrency.to_string().bold(),
+                timeout.to_string().bold()
             );
 
             let config = ScanConfig {
@@ -637,12 +637,12 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                     .load_preset(UTF8_FULL)
                     .apply_modifier(UTF8_ROUND_CORNERS)
                     .set_header(vec![
-                        Cell::new("IP"),
-                        Cell::new("Port"),
-                        Cell::new("Proto"),
-                        Cell::new("Service"),
-                        Cell::new("Status"),
-                        Cell::new("Time (ms)"),
+                        Cell::new("IP").fg(Color::Cyan),
+                        Cell::new("Port").fg(Color::Cyan),
+                        Cell::new("Proto").fg(Color::Cyan),
+                        Cell::new("Service").fg(Color::Cyan),
+                        Cell::new("Status").fg(Color::Cyan),
+                        Cell::new("Time (ms)").fg(Color::Cyan),
                     ]);
 
                 for r in &detected {
@@ -658,17 +658,27 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                         _ => (Cell::new(r.ip.to_string()), Cell::new("")),
                     };
 
+                    let time_str = r.response_time_ms
+                        .map(|t| format!("{} ms", t))
+                        .unwrap_or_else(|| "-".to_string());
+                    let mut time_cell = Cell::new(time_str);
+                    if let Some(ms) = r.response_time_ms {
+                        if ms < 50 {
+                            time_cell = time_cell.fg(Color::Green);
+                        } else if ms < 150 {
+                            time_cell = time_cell.fg(Color::Yellow);
+                        } else {
+                            time_cell = time_cell.fg(Color::Red);
+                        }
+                    }
+
                     table.add_row(vec![
                         ip_cell,
                         Cell::new(r.port),
                         Cell::new(r.protocol.to_uppercase()),
                         Cell::new(&r.service_name),
                         status_cell,
-                        Cell::new(
-                            r.response_time_ms
-                                .map(|t| t.to_string())
-                                .unwrap_or_else(|| "-".to_string()),
-                        ),
+                        time_cell,
                     ]);
                 }
                 println!("{}", table);
