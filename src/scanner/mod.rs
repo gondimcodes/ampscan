@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use uuid::Uuid;
+use colored::Colorize;
 
 /// Configuration for a scan run.
 pub struct ScanConfig {
@@ -87,12 +88,14 @@ pub async fn run_scan(
     let total_ips = all_ips.len();
     let total_probes = total_ips * ports.len();
 
+
     eprintln!(
-        "Scanning {} IPs × {} ports = {} probes (concurrency: {})",
-        total_ips,
-        ports.len(),
-        total_probes,
-        config.concurrency
+        "{} Scanning {} IPs × {} ports = {} probes (concurrency: {})",
+        "🌐".cyan().bold(),
+        total_ips.to_string().bold(),
+        ports.len().to_string().bold(),
+        total_probes.to_string().bold(),
+        config.concurrency.to_string().bold()
     );
 
     let mut report = ScanReport::new(Uuid::new_v4().to_string(), prefix_strings);
@@ -113,11 +116,33 @@ pub async fn run_scan(
     }
 
     let mut ip_liveness = std::collections::HashMap::with_capacity(all_ips.len());
+    let mut checked = 0;
+    let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let mut spinner_idx = 0;
+
+    use std::io::Write;
+    eprint!("  Discovered hosts: 0/{}", all_ips.len());
+    let _ = std::io::stderr().flush();
+
     while let Some(res) = liveness_set.join_next().await {
         if let Ok((ip, alive)) = res {
             ip_liveness.insert(ip, alive);
         }
+        checked += 1;
+        spinner_idx = (spinner_idx + 1) % spinner_chars.len();
+        eprint!(
+            "\r  {} Host discovery: {}/{}",
+            spinner_chars[spinner_idx].to_string().cyan(),
+            checked,
+            all_ips.len()
+        );
+        let _ = std::io::stderr().flush();
     }
+    eprintln!(
+        "\r  {} Host discovery complete (found {} active hosts)",
+        "✓".green().bold(),
+        ip_liveness.values().filter(|&&v| v).count().to_string().bold()
+    );
 
     // 2. Separate IPs into alive and dead
     let mut alive_ips = Vec::new();
@@ -172,9 +197,7 @@ pub async fn run_scan(
                     done += 1;
                     let step = (total_alive_probes / 100).max(1);
                     if done % step == 0 || done == total_alive_probes {
-                        use std::io::Write;
-                        eprint!("\r  Progress: {}/{} ({:.1}%)", done, total_alive_probes, (done as f64 / total_alive_probes as f64) * 100.0);
-                        let _ = std::io::stderr().flush();
+                        draw_progress(done, total_alive_probes);
                     }
                 }
                 Err(e) => eprintln!("\nTask error: {}", e),
@@ -188,12 +211,41 @@ pub async fn run_scan(
     // Print summary
     let vulnerable = report.vulnerable_results().len();
     let vuln_ips = report.vulnerable_ips().len();
+
     eprintln!(
-        "Scan complete: {} vulnerable ports found on {} IPs (out of {} tested)",
-        vulnerable, vuln_ips, report.total_ips
+        "{} Scan complete: {} vulnerable ports found on {} IPs (out of {} tested)",
+        "✓".green().bold(),
+        vulnerable.to_string().red().bold(),
+        vuln_ips.to_string().red().bold(),
+        report.total_ips.to_string().bold()
     );
 
     Ok(report)
+}
+
+fn draw_progress(done: usize, total: usize) {
+    use std::io::Write;
+    let width = 30;
+    let ratio = if total > 0 {
+        (done as f64 / total as f64).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let percent = ratio * 100.0;
+    let filled = (ratio * width as f64).round() as usize;
+    let empty = width - filled;
+    let bar_filled = "█".repeat(filled).cyan();
+    let bar_empty = "░".repeat(empty).bright_black();
+
+    eprint!(
+        "\r  Progress: [{}{}] {:.1}% ({}/{})",
+        bar_filled,
+        bar_empty,
+        percent,
+        done,
+        total
+    );
+    let _ = std::io::stderr().flush();
 }
 
 pub async fn scan_single_ip(
@@ -201,7 +253,6 @@ pub async fn scan_single_ip(
     ports: Vec<Port>,
     config: &ScanConfig,
 ) -> Result<Vec<ProbeResult>> {
-    use std::io::Write;
     let total = ports.len();
     let mut handles = Vec::with_capacity(total);
 
@@ -216,8 +267,7 @@ pub async fn scan_single_ip(
         let handle = tokio::spawn(async move {
             let result = probes::execute_probe(ip, &port_config, timeout, use_icmp).await;
             let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            eprint!("\r  Progress: {}/{} ({:.1}%)", done, total, (done as f64 / total as f64) * 100.0);
-            let _ = std::io::stderr().flush();
+            draw_progress(done, total);
             result
         });
         handles.push(handle);
