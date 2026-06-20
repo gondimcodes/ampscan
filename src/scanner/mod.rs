@@ -106,10 +106,14 @@ pub async fn run_scan(
     let semaphore = Arc::new(Semaphore::new(config.concurrency));
     let ports = Arc::new(ports);
     let timeout = config.timeout;
-    let use_icmp = config.use_icmp;    // 1. Perform concurrent host discovery (liveness check)
+    let use_icmp = config.use_icmp;
+
+    // 1. Perform concurrent host discovery (liveness check)
     let mut liveness_set = tokio::task::JoinSet::new();
     for &ip in &all_ips {
+        let sem = semaphore.clone();
         liveness_set.spawn(async move {
+            let _permit = sem.acquire().await.unwrap();
             let alive = probes::is_host_alive(ip, timeout, use_icmp).await;
             (ip, alive)
         });
