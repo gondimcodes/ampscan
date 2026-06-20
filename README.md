@@ -127,14 +127,12 @@ Defines the targets for batch scanning (accepts IPv4 and IPv6 ranges):
 AmpScan has two execution modes:
 
 #### 1. Batch Scan Mode (`scan run`)
-Fetches all prefixes and ports marked as active (`enabled`) in the database and performs parallel reachability tests.
+Fetches all prefixes and ports marked as active (`enabled`) in the database and performs parallel testing directly on all hosts.
 
 **Supported parameters:**
 *   `--concurrency <N>`: Number of probes sent simultaneously (default: `256`).
 *   `--timeout <S>`: Timeout for each probe's response in seconds (default: `3`).
 *   `--output <PATH>`: Name of the PDF file to be generated (default: `ampscan_report.pdf`).
-*   `--no-icmp`: Disables pre-host ping validation (ICMP). Useful if you are running without `root` privileges or `CAP_NET_RAW` permission on Linux.
-    *   *Note:* With `--no-icmp` active, local fallbacks (TCP handshakes) are attempted to check if the host is online, and the "Inconclusive" status will not be returned.
 *   `--prefix <CIDR>`: Manual network prefix to scan (e.g.: `192.168.1.0/24`). **Ignores database-configured prefixes and skips PDF report generation**.
 
 Robust execution example:
@@ -145,14 +143,14 @@ Robust execution example:
 
 Example with manual prefix:
 ```bash
-./target/release/ampscan scan run --prefix "10.0.0.0/29" --no-icmp
+./target/release/ampscan scan run --prefix "10.0.0.0/29"
 ```
 
 #### 2. Single IP Mode (`scan single`)
 Tests all active ports against a single destination IP, printing real-time responses and timings to the console:
 
 ```bash
-./target/release/ampscan scan single 1.1.1.1 --timeout 2 --no-icmp
+./target/release/ampscan scan single 1.1.1.1 --timeout 2
 ```
 
 ---
@@ -162,6 +160,6 @@ Tests all active ports against a single destination IP, printing real-time respo
 During each port scan, the status can be classified as:
 
 1.  🔴 **Open (Vulnerable):** The target responded to the sent probe. It means the amplification port is open and publicly responds to external requests without filtering.
-2.  🟢 **Closed:** The host responded to the ICMP ping or TCP connection, but the amplification service on the indicated port yielded no response.
-3.  🔵 **Inconclusive:** The tested host did not respond to the ICMP ping or probe, suggesting the host might be offline or entirely blocking diagnostic traffic.
+2.  🟢 **Closed:** The host responded to at least one of the active probes, but the amplification service on this specific port yielded no response.
+3.  🔵 **Inconclusive:** The tested host did not respond to any of the sent probes, suggesting the host might be offline or entirely blocking diagnostic traffic.
 4.  🟡 **Protected:** The port is open, but it is not vulnerable.

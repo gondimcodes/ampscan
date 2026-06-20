@@ -1,6 +1,6 @@
 [package]
 name = "ampscan"
-version = "1.1.7"
+version = "1.1.8"
 edition = "2021"
 description = "DDoS Amplification Port Testing Tool"
 authors = ["AmpScan"]
@@ -42,9 +42,6 @@ rand = "0.8"
 
 # Colored terminal output
 colored = "2"
-
-# ICMP ping (reachability check)
-surge-ping = "0.8"
 
 # Secure password input (no echo)
 rpassword = "7"

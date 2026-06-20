@@ -19,7 +19,6 @@ use colored::Colorize;
 pub struct ScanConfig {
     pub concurrency: usize,
     pub timeout: Duration,
-    pub use_icmp: bool,
 }
 
 impl Default for ScanConfig {
@@ -27,7 +26,6 @@ impl Default for ScanConfig {
         Self {
             concurrency: 256,
             timeout: Duration::from_secs(3),
-            use_icmp: true,
         }
     }
 }
@@ -88,7 +86,6 @@ pub async fn run_scan(
     let total_ips = all_ips.len();
     let total_probes = total_ips * ports.len();
 
-
     eprintln!(
         "{} Scanning {} IPs × {} ports = {} probes (concurrency: {})",
         "🌐".cyan().bold(),
@@ -106,108 +103,51 @@ pub async fn run_scan(
     let semaphore = Arc::new(Semaphore::new(config.concurrency));
     let ports = Arc::new(ports);
     let timeout = config.timeout;
-    let use_icmp = config.use_icmp;
 
-    // 1. Perform concurrent host discovery (liveness check)
-    let mut liveness_set = tokio::task::JoinSet::new();
-    for &ip in &all_ips {
-        let sem = semaphore.clone();
-        liveness_set.spawn(async move {
-            let _permit = sem.acquire().await.unwrap();
-            let alive = probes::is_host_alive(ip, timeout, use_icmp).await;
-            (ip, alive)
-        });
-    }
-
-    let mut ip_liveness = std::collections::HashMap::with_capacity(all_ips.len());
-    let mut checked = 0;
-    let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-    let mut spinner_idx = 0;
-
-    use std::io::Write;
-    eprint!("  Discovered hosts: 0/{}", all_ips.len());
-    let _ = std::io::stderr().flush();
-
-    while let Some(res) = liveness_set.join_next().await {
-        if let Ok((ip, alive)) = res {
-            ip_liveness.insert(ip, alive);
-        }
-        checked += 1;
-        spinner_idx = (spinner_idx + 1) % spinner_chars.len();
-        eprint!(
-            "\r  {} Host discovery: {}/{}",
-            spinner_chars[spinner_idx].to_string().cyan(),
-            checked,
-            all_ips.len()
-        );
-        let _ = std::io::stderr().flush();
-    }
-    eprintln!(
-        "\r  {} Host discovery complete (found {} active hosts)",
-        "✓".green().bold(),
-        ip_liveness.values().filter(|&&v| v).count().to_string().bold()
-    );
-
-    // 2. Separate IPs into alive and dead
-    let mut alive_ips = Vec::new();
-    for ip in all_ips {
-        if *ip_liveness.get(&ip).unwrap_or(&false) {
-            alive_ips.push(ip);
-        } else {
-            // For dead hosts, directly record Inconclusive results without sending any port probes
-            for port_config in &*ports {
-                report.results.push(result::ProbeResult {
-                    ip,
-                    port: port_config.port,
-                    protocol: port_config.protocol.clone(),
-                    service_name: port_config.name.clone(),
-                    description: port_config.description.clone(),
-                    status: result::PortStatus::Inconclusive,
-                    response_time_ms: None,
-                    timestamp: chrono::Utc::now(),
-                });
-            }
-        }
-    }
-
-    let total_alive_ips = alive_ips.len();
-    let total_alive_probes = total_alive_ips * ports.len();
-
-    if total_alive_ips > 0 {
+    if total_ips > 0 {
         let mut join_set = tokio::task::JoinSet::new();
 
-        for ip in alive_ips {
+        for ip in all_ips {
             for port_config in ports.iter() {
                 let sem = semaphore.clone();
                 let port_config = port_config.clone();
 
                 join_set.spawn(async move {
                     let _permit = sem.acquire().await.unwrap();
-                    probes::execute_probe(ip, &port_config, timeout, use_icmp).await
+                    probes::execute_probe(ip, &port_config, timeout, false).await
                 });
             }
         }
 
-        // Collect results in completion order for alive hosts
+        // Collect results in completion order
         let mut done = 0;
         while let Some(res) = join_set.join_next().await {
             match res {
-                Ok(mut result) => {
-                    // Since we know the host is alive, change Inconclusive status to Closed
-                    if result.status == result::PortStatus::Inconclusive {
-                        result.status = result::PortStatus::Closed;
-                    }
+                Ok(result) => {
                     report.results.push(result);
                     done += 1;
-                    let step = (total_alive_probes / 100).max(1);
-                    if done % step == 0 || done == total_alive_probes {
-                        draw_progress(done, total_alive_probes);
+                    let step = (total_probes / 100).max(1);
+                    if done % step == 0 || done == total_probes {
+                        draw_progress(done, total_probes);
                     }
                 }
                 Err(e) => eprintln!("\nTask error: {}", e),
             }
         }
         eprintln!(); // Newline after progress
+
+        // Post-process: if an IP has any Open or OpenProtected port, mark all other Inconclusive ports for that IP as Closed.
+        let mut alive_ips = std::collections::HashSet::new();
+        for r in &report.results {
+            if r.status == result::PortStatus::Open || r.status == result::PortStatus::OpenProtected {
+                alive_ips.insert(r.ip);
+            }
+        }
+        for r in &mut report.results {
+            if alive_ips.contains(&r.ip) && r.status == result::PortStatus::Inconclusive {
+                r.status = result::PortStatus::Closed;
+            }
+        }
     }
 
     report.finalize();
@@ -266,10 +206,9 @@ pub async fn scan_single_ip(
     for port_config in ports {
         let completed = completed.clone();
         let timeout = config.timeout;
-        let use_icmp = config.use_icmp;
 
         let handle = tokio::spawn(async move {
-            let result = probes::execute_probe(ip, &port_config, timeout, use_icmp).await;
+            let result = probes::execute_probe(ip, &port_config, timeout, false).await;
             let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
             draw_progress(done, total);
             result
@@ -287,15 +226,9 @@ pub async fn scan_single_ip(
     eprintln!();
 
     // Post-process: if any result is Open or OpenProtected, the host is alive.
-    // Otherwise, check if the host is alive exactly once.
-    let any_alive = results.iter().any(|r| {
+    let is_alive = results.iter().any(|r| {
         r.status == result::PortStatus::Open || r.status == result::PortStatus::OpenProtected
     });
-    let is_alive = if any_alive {
-        true
-    } else {
-        probes::is_host_alive(ip, config.timeout, config.use_icmp).await
-    };
 
     if is_alive {
         for r in &mut results {

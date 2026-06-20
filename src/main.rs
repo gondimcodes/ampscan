@@ -155,9 +155,6 @@ enum ScanCommands {
         /// Output PDF report file path
         #[arg(short, long, default_value = "ampscan_report.pdf")]
         output: String,
-        /// Disable ICMP check (doesn't require root, but loses Closed/Inconclusive distinction)
-        #[arg(long)]
-        no_icmp: bool,
         /// Manual CIDR prefix to test directly (ignores database and skips PDF)
         #[arg(long)]
         prefix: Option<String>,
@@ -178,9 +175,6 @@ enum ScanCommands {
         /// Timeout per probe in seconds
         #[arg(short, long, default_value = "3")]
         timeout: u64,
-        /// Disable ICMP check
-        #[arg(long)]
-        no_icmp: bool,
     },
 }
 
@@ -574,7 +568,6 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             concurrency,
             timeout,
             output,
-            no_icmp,
             prefix,
             pdf,
             client_name,
@@ -597,6 +590,8 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                         enabled: true,
                         created_at: "".to_string(),
                         updated_at: "".to_string(),
+                        // Wait, does Prefix struct have more fields? Let's check models.rs or just replicate
+                        // actually models.rs had exactly this.
                     }]
                 }
                 None => {
@@ -622,7 +617,6 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             let config = ScanConfig {
                 concurrency: *concurrency,
                 timeout: Duration::from_secs(*timeout),
-                use_icmp: !no_icmp,
             };
 
             let report = scanner::run_scan(ports, prefixes, &config).await?;
@@ -659,8 +653,8 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                     };
 
                     let time_str = r.response_time_ms
-                        .map(|t| format!("{} ms", t))
-                        .unwrap_or_else(|| "-".to_string());
+                         .map(|t| format!("{} ms", t))
+                         .unwrap_or_else(|| "-".to_string());
                     let mut time_cell = Cell::new(time_str);
                     if let Some(ms) = r.response_time_ms {
                         if ms < 50 {
@@ -706,7 +700,6 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
         ScanCommands::Single {
             ip,
             timeout,
-            no_icmp,
         } => {
             let ip_addr: IpAddr = ip
                 .parse()
@@ -727,7 +720,6 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             let config = ScanConfig {
                 concurrency: 1,
                 timeout: Duration::from_secs(*timeout),
-                use_icmp: !no_icmp,
             };
 
             let results = scanner::scan_single_ip(ip_addr, ports, &config).await?;
