@@ -15,11 +15,13 @@ Before running any subcommand, you must define the following variables in your e
 *   `AMPSCAN_DB_KEY`: **[Required]** The secret key used to encrypt/decrypt the database (a long string with more than 32 characters is recommended).
 *   `AMPSCAN_DB_PATH`: *(Optional)* Custom path for the database file (default: `ampscan.db`).
 *   `AMPSCAN_USER`: *(Optional)* Defines the administrator user to prevent the terminal from interactively prompting for the username on each command.
+*   `AMPSCAN_PASS`: *(Optional)* Defines the administrator password to prevent the terminal from interactively prompting for the password. Extremely useful for automation/cron scans.
 
 Environment preparation example:
 ```bash
 export AMPSCAN_DB_KEY="a_very_secure_and_long_secret_key_for_the_db"
 export AMPSCAN_USER="admin"
+export AMPSCAN_PASS="my_secure_admin_password"
 ```
 
 ---
