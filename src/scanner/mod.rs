@@ -149,7 +149,7 @@ pub async fn run_scan(
                     report.results.push(result);
                     done += 1;
                     let step = (total_probes / 100).max(1);
-                    if done % step == 0 || done == total_probes {
+                    if done == 1 || done % 200 == 0 || done % step == 0 || done == total_probes {
                         draw_progress(done, total_probes);
                     }
                 }
