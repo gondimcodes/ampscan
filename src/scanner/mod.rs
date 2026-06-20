@@ -107,6 +107,14 @@ pub async fn run_scan(
     if total_ips > 0 {
         let mut join_set = tokio::task::JoinSet::new();
 
+        let mut count = 0;
+        let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        let mut spinner_idx = 0;
+
+        use std::io::Write;
+        eprint!("  Preparing probes: 0/{}", total_probes);
+        let _ = std::io::stderr().flush();
+
         for ip in all_ips {
             for port_config in ports.iter() {
                 let sem = semaphore.clone();
@@ -116,8 +124,22 @@ pub async fn run_scan(
                     let _permit = sem.acquire().await.unwrap();
                     probes::execute_probe(ip, &port_config, timeout, false).await
                 });
+
+                count += 1;
+                if count % 5000 == 0 || count == total_probes {
+                    spinner_idx = (spinner_idx + 1) % spinner_chars.len();
+                    eprint!(
+                        "\r  {} Preparing probes: {}/{}",
+                        spinner_chars[spinner_idx].to_string().cyan(),
+                        count,
+                        total_probes
+                    );
+                    let _ = std::io::stderr().flush();
+                    tokio::task::yield_now().await;
+                }
             }
         }
+        eprintln!("\r  {} All probes prepared and queued successfully.", "✓".green().bold());
 
         // Collect results in completion order
         let mut done = 0;
