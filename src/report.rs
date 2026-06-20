@@ -556,6 +556,52 @@ pub fn generate_pdf(
         }
     }
 
+    // ── Manual Validation Procedures ───────────────────────────────
+    let open_services: std::collections::BTreeSet<String> = report
+        .results
+        .iter()
+        .filter(|r| r.status == PortStatus::Open || r.status == PortStatus::OpenProtected)
+        .map(|r| r.service_name.clone())
+        .collect();
+
+    if !open_services.is_empty() {
+        w.new_page();
+        w.text("Manual Validation Procedures", HEADING_SIZE, HEADING_LH, true);
+        w.hline();
+        w.text(
+            "To manually verify the identified amplification ports, you can execute the following commands from a terminal:",
+            BODY_SIZE,
+            BODY_LH,
+            false,
+        );
+        w.skip(4.0);
+
+        for service in &open_services {
+            w.ensure_space(BODY_LH * 5.0 + 4.0);
+            w.text(&format!("* Service: {}", service), SUBHEADING_SIZE, SUBHEADING_LH, true);
+            
+            let command = match service.to_uppercase().as_str() {
+                "DNS" => "dig +short -t ANY google.com @<IP>",
+                "SNMP" => "snmpget -v 2c -c public <IP> iso.3.6.1.2.1.1.1.0",
+                "NTP" => "ntpq -c rv <IP>",
+                "MEMCACHED" => "printf '\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x00stats\\n' | nc -u -w 3 <IP> 11211",
+                "SSDP" => "printf 'M-SEARCH * HTTP/1.1\\r\\nHost:239.255.255.250:1900\\r\\nST:upnp:rootdevice\\r\\nMan:\"ssdp:discover\"\\r\\nMX:3\\r\\n\\r\\n' | nc -u -w 3 <IP> 1900",
+                "NETBIOS" => "nmblookup -A <IP>",
+                "RPC" => "rpcinfo -T udp -p <IP>",
+                "LDAP" | "CLDAP" => "ldapsearch -x -h <IP> -s base",
+                "TFTP" => "tftp <IP> -c get a.pdf",
+                "CHARGEN" => "nc -u -w 3 <IP> 19",
+                "QOTD" => "nc -u -w 3 <IP> 17",
+                "SLP" => "printf '\\x02\\x01\\x00\\x00\\x36\\x20\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x02\\x65\\x6e\\x00\\x00\\x00\\x15\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x3a\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x2d\\x61\\x67\\x65\\x6e\\x74\\x00\\x07\\x64\\x65\\x66\\x61\\x75\\x6c\\x74\\x00\\x00\\x00\\x00' | nc -u -w 3 <IP> 427",
+                _ => "nc -u -w 3 <IP> <PORT>",
+            };
+
+            w.text("  Command:", SMALL_SIZE, SMALL_LH, true);
+            w.text(&format!("  {}", command), SMALL_SIZE, SMALL_LH, false);
+            w.skip(3.0);
+        }
+    }
+
     // ── Disclaimer ─────────────────────────────────────────────────
     w.skip(20.0);
     w.ensure_space(20.0);
