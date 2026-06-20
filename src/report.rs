@@ -560,7 +560,7 @@ pub fn generate_pdf(
     let open_services: std::collections::BTreeSet<String> = report
         .results
         .iter()
-        .filter(|r| r.status == PortStatus::Open || r.status == PortStatus::OpenProtected)
+        .filter(|r| r.status == PortStatus::Open)
         .map(|r| r.service_name.clone())
         .collect();
 
