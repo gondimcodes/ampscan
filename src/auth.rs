@@ -79,23 +79,22 @@ mod tests {
     }
 
     #[test]
-    fn test_prompt_password_from_env() {
+    fn test_env_passwords_combined() {
+        // Run env tests sequentially to avoid parallel test race conditions on the environment variable
+        
+        // 1. test_prompt_password_from_env
         std::env::set_var("AMPSCAN_PASS", "my_env_password_123");
         let result = prompt_password();
         std::env::remove_var("AMPSCAN_PASS");
         assert_eq!(result.unwrap(), "my_env_password_123");
-    }
 
-    #[test]
-    fn test_prompt_new_password_from_env() {
+        // 2. test_prompt_new_password_from_env
         std::env::set_var("AMPSCAN_PASS", "my_env_password_123");
         let result = prompt_new_password();
         std::env::remove_var("AMPSCAN_PASS");
         assert_eq!(result.unwrap(), "my_env_password_123");
-    }
 
-    #[test]
-    fn test_prompt_new_password_too_short_from_env() {
+        // 3. test_prompt_new_password_too_short_from_env
         std::env::set_var("AMPSCAN_PASS", "short");
         let result = prompt_new_password();
         std::env::remove_var("AMPSCAN_PASS");

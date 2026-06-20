@@ -47,18 +47,6 @@ pub async fn execute_probe(
     }
 }
 
-/// Check if a host is reachable.
-/// Tries ICMP first (if enabled and available), falls back to TCP heuristic.
-pub async fn is_host_alive(ip: IpAddr, timeout: Duration, use_icmp: bool) -> bool {
-    if use_icmp {
-        if let Some(alive) = try_icmp_ping(ip, timeout).await {
-            return alive;
-        }
-    }
-    // Fallback: try TCP connect to common ports
-    try_tcp_alive(ip, timeout).await
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // UDP probe execution
 // ═══════════════════════════════════════════════════════════════════════════
@@ -183,46 +171,6 @@ async fn execute_tcp_probe(
         }
         Err(_) => PortStatus::Inconclusive, // Timeout
     }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Reachability checks
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// Try ICMP ping using surge-ping. Returns None if ICMP is unavailable (e.g., no root).
-async fn try_icmp_ping(ip: IpAddr, timeout: Duration) -> Option<bool> {
-    use surge_ping::{Client, Config, PingIdentifier, PingSequence, ICMP};
-
-    let kind = match ip {
-        IpAddr::V4(_) => ICMP::V4,
-        IpAddr::V6(_) => ICMP::V6,
-    };
-    let config = Config::builder().kind(kind).build();
-    let client = Client::new(&config).ok()?;
-
-    let mut pinger = client.pinger(ip, PingIdentifier(rand::random())).await;
-    pinger.timeout(timeout);
-
-    match pinger.ping(PingSequence(0), &[0u8; 56]).await {
-        Ok(_) => Some(true),
-        Err(_) => Some(false),
-    }
-}
-
-/// Fallback: check if host is alive by attempting TCP connections to common ports.
-async fn try_tcp_alive(ip: IpAddr, timeout: Duration) -> bool {
-    let common_ports = [80, 443, 22, 25, 53];
-    let short_timeout = Duration::from_millis(timeout.as_millis() as u64 / 2).max(Duration::from_millis(500));
-
-    for port in common_ports {
-        let addr = SocketAddr::new(ip, port);
-        match tokio::time::timeout(short_timeout, TcpStream::connect(addr)).await {
-            Ok(Ok(_)) => return true,
-            Ok(Err(e)) if e.kind() == io::ErrorKind::ConnectionRefused => return true,
-            _ => {}
-        }
-    }
-    false
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
