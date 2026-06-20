@@ -31,6 +31,14 @@ pub fn verify_password(password: &str, hash_str: &str) -> Result<bool> {
 /// Prompt the user for a password with confirmation (for new passwords).
 /// Returns the password string.
 pub fn prompt_new_password() -> Result<String> {
+    if let Ok(pass) = std::env::var("AMPSCAN_PASS") {
+        if !pass.is_empty() {
+            if pass.len() < 8 {
+                anyhow::bail!("Password from AMPSCAN_PASS must be at least 8 characters.");
+            }
+            return Ok(pass);
+        }
+    }
     loop {
         let password = rpassword::prompt_password("Password: ")
             .context("Failed to read password")?;
@@ -50,6 +58,11 @@ pub fn prompt_new_password() -> Result<String> {
 
 /// Prompt the user for a password (for login).
 pub fn prompt_password() -> Result<String> {
+    if let Ok(pass) = std::env::var("AMPSCAN_PASS") {
+        if !pass.is_empty() {
+            return Ok(pass);
+        }
+    }
     rpassword::prompt_password("Password: ").context("Failed to read password")
 }
 
@@ -63,5 +76,29 @@ mod tests {
         let hash = hash_password(password).unwrap();
         assert!(verify_password(password, &hash).unwrap());
         assert!(!verify_password("wrong_password", &hash).unwrap());
+    }
+
+    #[test]
+    fn test_prompt_password_from_env() {
+        std::env::set_var("AMPSCAN_PASS", "my_env_password_123");
+        let result = prompt_password();
+        std::env::remove_var("AMPSCAN_PASS");
+        assert_eq!(result.unwrap(), "my_env_password_123");
+    }
+
+    #[test]
+    fn test_prompt_new_password_from_env() {
+        std::env::set_var("AMPSCAN_PASS", "my_env_password_123");
+        let result = prompt_new_password();
+        std::env::remove_var("AMPSCAN_PASS");
+        assert_eq!(result.unwrap(), "my_env_password_123");
+    }
+
+    #[test]
+    fn test_prompt_new_password_too_short_from_env() {
+        std::env::set_var("AMPSCAN_PASS", "short");
+        let result = prompt_new_password();
+        std::env::remove_var("AMPSCAN_PASS");
+        assert!(result.is_err());
     }
 }
