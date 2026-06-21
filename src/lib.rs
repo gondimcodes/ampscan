@@ -11,3 +11,6 @@ pub mod db;
 pub mod report;
 /// Network scanning and probing
 pub mod scanner;
+/// System resource limits
+pub mod sys_limits;
+

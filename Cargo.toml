@@ -1,6 +1,6 @@
 [package]
 name = "ampscan"
-version = "1.2.0"
+version = "1.2.1"
 edition = "2021"
 description = "DDoS Amplification Port Testing Tool"
 authors = ["AmpScan"]
@@ -51,3 +51,6 @@ uuid = { version = "1", features = ["v4"] }
 
 # Terminal table formatting
 comfy-table = "7"
+
+# Unix system limits
+libc = "0.2"

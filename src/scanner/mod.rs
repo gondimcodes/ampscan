@@ -19,6 +19,7 @@ use colored::Colorize;
 pub struct ScanConfig {
     pub concurrency: usize,
     pub timeout: Duration,
+    pub retries: usize,
 }
 
 impl Default for ScanConfig {
@@ -26,6 +27,7 @@ impl Default for ScanConfig {
         Self {
             concurrency: 256,
             timeout: Duration::from_secs(3),
+            retries: 2,
         }
     }
 }
@@ -103,6 +105,7 @@ pub async fn run_scan(
     let semaphore = Arc::new(Semaphore::new(config.concurrency));
     let ports = Arc::new(ports);
     let timeout = config.timeout;
+    let retries = config.retries;
 
     if total_ips > 0 {
         let mut join_set = tokio::task::JoinSet::new();
@@ -122,7 +125,7 @@ pub async fn run_scan(
 
                 join_set.spawn(async move {
                     let _permit = sem.acquire().await.unwrap();
-                    probes::execute_probe(ip, &port_config, timeout, false).await
+                    probes::execute_probe(ip, &port_config, timeout, false, retries).await
                 });
 
                 count += 1;
@@ -143,9 +146,22 @@ pub async fn run_scan(
 
         // Collect results in completion order
         let mut done = 0;
+        let mut fd_exhaustion_detected = false;
+        let mut fd_error_msg = String::new();
+
         while let Some(res) = join_set.join_next().await {
             match res {
                 Ok(result) => {
+                    // Check if it failed with file descriptor exhaustion
+                    if let result::PortStatus::Error(ref err_msg) = result.status {
+                        if err_msg.contains("CRITICAL_FD_EXHAUSTION") {
+                            fd_exhaustion_detected = true;
+                            fd_error_msg = err_msg.clone();
+                            join_set.abort_all();
+                            break;
+                        }
+                    }
+
                     report.results.push(result);
                     done += 1;
                     let step = (total_probes / 100).max(1);
@@ -153,10 +169,21 @@ pub async fn run_scan(
                         draw_progress(done, total_probes);
                     }
                 }
-                Err(e) => eprintln!("\nTask error: {}", e),
+                Err(e) => {
+                    if !e.is_cancelled() {
+                        eprintln!("\nTask error: {}", e);
+                    }
+                }
             }
         }
         eprintln!(); // Newline after progress
+
+        if fd_exhaustion_detected {
+            eprintln!("\n\n❌ {} Scan aborted due to resource exhaustion (Too many open files)!", "CRITICAL".red().bold());
+            eprintln!("   Error details: {}", fd_error_msg.yellow());
+            eprintln!("   Please reduce '--concurrency' or increase 'ulimit -n' and try again.\n");
+            anyhow::bail!("Scan aborted: OS limit reached (Too many open files).");
+        }
 
         // Post-process: if an IP has any Open or OpenProtected port, mark all other Inconclusive ports for that IP as Closed.
         let mut alive_ips = std::collections::HashSet::new();
@@ -228,9 +255,10 @@ pub async fn scan_single_ip(
     for port_config in ports {
         let completed = completed.clone();
         let timeout = config.timeout;
+        let retries = config.retries;
 
         let handle = tokio::spawn(async move {
-            let result = probes::execute_probe(ip, &port_config, timeout, false).await;
+            let result = probes::execute_probe(ip, &port_config, timeout, false, retries).await;
             let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
             draw_progress(done, total);
             result
