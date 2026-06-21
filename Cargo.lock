@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "ampscan"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "argon2",
@@ -32,6 +32,7 @@ dependencies = [
  "comfy-table",
  "image",
  "ipnet",
+ "libc",
  "printpdf",
  "rand",
  "rpassword",

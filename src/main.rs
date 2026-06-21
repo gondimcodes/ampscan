@@ -152,6 +152,9 @@ enum ScanCommands {
         /// Timeout per probe in seconds
         #[arg(short, long, default_value = "3")]
         timeout: u64,
+        /// Number of retries for UDP probes (default is 2, giving 3 total attempts)
+        #[arg(short, long, default_value = "2")]
+        retries: usize,
         /// Output PDF report file path
         #[arg(short, long, default_value = "ampscan_report.pdf")]
         output: String,
@@ -175,6 +178,12 @@ enum ScanCommands {
         /// Timeout per probe in seconds
         #[arg(short, long, default_value = "3")]
         timeout: u64,
+        /// Maximum number of simultaneous probes
+        #[arg(short, long, default_value = "1")]
+        concurrency: usize,
+        /// Number of retries for UDP probes (default is 2, giving 3 total attempts)
+        #[arg(short, long, default_value = "2")]
+        retries: usize,
     },
 }
 
@@ -567,6 +576,7 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
         ScanCommands::Run {
             concurrency,
             timeout,
+            retries,
             output,
             prefix,
             pdf,
@@ -590,8 +600,6 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                         enabled: true,
                         created_at: "".to_string(),
                         updated_at: "".to_string(),
-                        // Wait, does Prefix struct have more fields? Let's check models.rs or just replicate
-                        // actually models.rs had exactly this.
                     }]
                 }
                 None => {
@@ -605,18 +613,25 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                 }
             };
 
+            // Attempt to raise file descriptor limit for Unix
+            if let Err(e) = ampscan::sys_limits::try_raise_fd_limit(*concurrency) {
+                eprintln!("⚠️  Failed to raise system file descriptor limit: {}", e);
+            }
+
             println!("\n{} Starting scan...", "🌐".cyan().bold());
             println!(
-                "  Enabled ports: {} | Prefixes: {} | Concurrency: {} | Timeout: {}s",
+                "  Enabled ports: {} | Prefixes: {} | Concurrency: {} | Timeout: {}s | Retries: {}",
                 ports.len().to_string().bold(),
                 prefixes.len().to_string().bold(),
                 concurrency.to_string().bold(),
-                timeout.to_string().bold()
+                timeout.to_string().bold(),
+                retries.to_string().bold()
             );
 
             let config = ScanConfig {
                 concurrency: *concurrency,
                 timeout: Duration::from_secs(*timeout),
+                retries: *retries,
             };
 
             let report = scanner::run_scan(ports, prefixes, &config).await?;
@@ -700,6 +715,8 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
         ScanCommands::Single {
             ip,
             timeout,
+            concurrency,
+            retries,
         } => {
             let ip_addr: IpAddr = ip
                 .parse()
@@ -710,16 +727,24 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                 anyhow::bail!("No enabled ports to test.");
             }
 
+            // Attempt to raise file descriptor limit for Unix
+            if let Err(e) = ampscan::sys_limits::try_raise_fd_limit(*concurrency) {
+                eprintln!("⚠️  Failed to raise system file descriptor limit: {}", e);
+            }
+
             println!(
-                "\n{} Testing {} ({} ports)...\n",
+                "\n{} Testing {} ({} ports, Concurrency: {}, Retries: {})...\n",
                 "▶".cyan().bold(),
                 ip_addr,
-                ports.len()
+                ports.len(),
+                concurrency.to_string().bold(),
+                retries.to_string().bold()
             );
 
             let config = ScanConfig {
-                concurrency: 1,
+                concurrency: *concurrency,
                 timeout: Duration::from_secs(*timeout),
+                retries: *retries,
             };
 
             let results = scanner::scan_single_ip(ip_addr, ports, &config).await?;

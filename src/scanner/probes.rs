@@ -17,6 +17,7 @@ pub async fn execute_probe(
     port_config: &Port,
     timeout: Duration,
     use_icmp: bool,
+    retries: usize,
 ) -> ProbeResult {
     let start = Instant::now();
 
@@ -24,10 +25,10 @@ pub async fn execute_probe(
         "tcp" => execute_tcp_probe(ip, port_config.port, timeout, use_icmp).await,
         "udp" => {
             if port_config.probe_type == "dns" {
-                execute_dns_probe(ip, port_config.port, timeout, use_icmp).await
+                execute_dns_probe(ip, port_config.port, timeout, use_icmp, retries).await
             } else {
                 let payload = build_payload(&port_config.probe_type, port_config.probe_payload.as_deref());
-                execute_udp_probe(ip, port_config.port, &payload, timeout, use_icmp).await
+                execute_udp_probe(ip, port_config.port, &payload, timeout, use_icmp, retries).await
             }
         }
         other => PortStatus::Error(format!("Unknown protocol: {}", other)),
@@ -56,9 +57,10 @@ async fn execute_dns_probe(
     port: u16,
     timeout: Duration,
     _use_icmp: bool,
+    retries: usize,
 ) -> PortStatus {
     let payload = build_dns_payload();
-    match send_udp_probe(ip, port, &payload, timeout).await {
+    match send_udp_probe(ip, port, &payload, timeout, retries).await {
         Ok(Some(response)) => {
             // Check if it's a DNS response and has RCODE = 5 (REFUSED) or RA = 0 (Recursion Available flag not set)
             if response.len() >= 4 {
@@ -74,7 +76,14 @@ async fn execute_dns_probe(
             }
         }
         Ok(None) => PortStatus::Inconclusive,
-        Err(e) => PortStatus::Error(e.to_string()),
+        Err(e) => {
+            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            if is_fd_exhaustion {
+                PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e))
+            } else {
+                PortStatus::Error(e.to_string())
+            }
+        }
     }
 }
 
@@ -84,11 +93,19 @@ async fn execute_udp_probe(
     payload: &[u8],
     timeout: Duration,
     _use_icmp: bool,
+    retries: usize,
 ) -> PortStatus {
-    match send_udp_probe(ip, port, payload, timeout).await {
+    match send_udp_probe(ip, port, payload, timeout, retries).await {
         Ok(Some(_)) => PortStatus::Open,
         Ok(None) => PortStatus::Inconclusive,
-        Err(e) => PortStatus::Error(e.to_string()),
+        Err(e) => {
+            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            if is_fd_exhaustion {
+                PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e))
+            } else {
+                PortStatus::Error(e.to_string())
+            }
+        }
     }
 }
 
@@ -97,20 +114,27 @@ async fn send_udp_probe(
     port: u16,
     payload: &[u8],
     timeout: Duration,
+    retries: usize,
 ) -> io::Result<Option<Vec<u8>>> {
     let bind_addr: SocketAddr = match ip {
         IpAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
         IpAddr::V6(_) => "[::]:0".parse().unwrap(),
     };
 
-    let max_attempts = 3;
+    let max_attempts = retries + 1;
     let attempt_timeout = Duration::from_millis(
         (timeout.as_millis() as u64 / 2).max(1000)
     );
     let mut last_err = None;
 
     for attempt in 1..=max_attempts {
-        let socket = UdpSocket::bind(bind_addr).await?;
+        let socket = match UdpSocket::bind(bind_addr).await {
+            Ok(s) => s,
+            Err(e) => {
+                last_err = Some(e);
+                break; // Stop retries if we can't even bind the local socket (typically EMFILE/ENFILE)
+            }
+        };
         let dest = SocketAddr::new(ip, port);
 
         if let Err(e) = socket.send_to(payload, dest).await {
@@ -162,8 +186,11 @@ async fn execute_tcp_probe(
     match tokio::time::timeout(timeout, TcpStream::connect(dest)).await {
         Ok(Ok(_stream)) => PortStatus::Open, // Connection accepted
         Ok(Err(e)) => {
-            // Connection refused = host alive, port closed
-            if e.kind() == io::ErrorKind::ConnectionRefused {
+            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            if is_fd_exhaustion {
+                PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e))
+            } else if e.kind() == io::ErrorKind::ConnectionRefused {
+                // Connection refused = host alive, port closed
                 PortStatus::Closed
             } else {
                 PortStatus::Inconclusive
