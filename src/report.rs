@@ -557,11 +557,11 @@ pub fn generate_pdf(
     }
 
     // ── Manual Validation Procedures ───────────────────────────────
-    let open_services: std::collections::BTreeSet<String> = report
+    let open_services: std::collections::BTreeSet<(String, u16, String)> = report
         .results
         .iter()
         .filter(|r| r.status == PortStatus::Open)
-        .map(|r| r.service_name.clone())
+        .map(|r| (r.service_name.clone(), r.port, r.protocol.clone()))
         .collect();
 
     if !open_services.is_empty() {
@@ -576,24 +576,56 @@ pub fn generate_pdf(
         );
         w.skip(4.0);
 
-        for service in &open_services {
+        for (service, port, protocol) in &open_services {
             w.ensure_space(BODY_LH * 5.0 + 4.0);
             w.text(&format!("* Service: {}", service), SUBHEADING_SIZE, SUBHEADING_LH, true);
             
             let command = match service.to_uppercase().as_str() {
-                "DNS" => "dig +short -t ANY google.com @<IP>",
-                "SNMP" => "snmpget -v 2c -c public <IP> iso.3.6.1.2.1.1.1.0",
-                "NTP" => "ntpq -c rv <IP>",
-                "MEMCACHED" => "printf '\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x00stats\\n' | nc -u -w 3 <IP> 11211",
-                "SSDP" => "printf 'M-SEARCH * HTTP/1.1\\r\\nHost:239.255.255.250:1900\\r\\nST:upnp:rootdevice\\r\\nMan:\"ssdp:discover\"\\r\\nMX:3\\r\\n\\r\\n' | nc -u -w 3 <IP> 1900",
-                "NETBIOS" => "nmblookup -A <IP>",
-                "RPC" => "rpcinfo -T udp -p <IP>",
-                "LDAP" | "CLDAP" => "ldapsearch -x -h <IP> -s base",
-                "TFTP" => "tftp <IP> -c get a.pdf",
-                "CHARGEN" => "nc -u -w 3 <IP> 19",
-                "QOTD" => "nc -u -w 3 <IP> 17",
-                "SLP" => "printf '\\x02\\x01\\x00\\x00\\x36\\x20\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x02\\x65\\x6e\\x00\\x00\\x00\\x15\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x3a\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x2d\\x61\\x67\\x65\\x6e\\x74\\x00\\x07\\x64\\x65\\x66\\x61\\x75\\x6c\\x74\\x00\\x00\\x00\\x00' | nc -u -w 3 <IP> 427",
-                _ => "nc -u -w 3 <IP> <PORT>",
+                "DNS" => "dig +short -t ANY google.com @<IP>".to_string(),
+                "SNMP" => "snmpget -v 2c -c public <IP> iso.3.6.1.2.1.1.1.0".to_string(),
+                "NTP" => "ntpq -c rv <IP>".to_string(),
+                "MEMCACHED" => {
+                    if protocol.to_lowercase() == "tcp" {
+                        "printf 'stats\\r\\nquit\\r\\n' | nc -w 3 <IP> 11211".to_string()
+                    } else {
+                        "printf '\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x00stats\\n' | nc -u -w 3 <IP> 11211".to_string()
+                    }
+                }
+                "SSDP" => "printf 'M-SEARCH * HTTP/1.1\\r\\nHost:239.255.255.250:1900\\r\\nST:upnp:rootdevice\\r\\nMan:\"ssdp:discover\"\\r\\nMX:3\\r\\n\\r\\n' | nc -u -w 3 <IP> 1900".to_string(),
+                "NETBIOS" => "nmblookup -A <IP>".to_string(),
+                "RPC" => {
+                    if protocol.to_lowercase() == "tcp" {
+                        "rpcinfo -T tcp -p <IP>".to_string()
+                    } else {
+                        "rpcinfo -T udp -p <IP>".to_string()
+                    }
+                }
+                "LDAP" | "CLDAP" => "ldapsearch -x -h <IP> -s base".to_string(),
+                "TFTP" => "tftp <IP> -c get a.pdf".to_string(),
+                "CHARGEN" => {
+                    if protocol.to_lowercase() == "tcp" {
+                        "nc -w 3 <IP> 19".to_string()
+                    } else {
+                        "nc -u -w 3 <IP> 19".to_string()
+                    }
+                }
+                "QOTD" => {
+                    if protocol.to_lowercase() == "tcp" {
+                        "nc -w 3 <IP> 17".to_string()
+                    } else {
+                        "nc -u -w 3 <IP> 17".to_string()
+                    }
+                }
+                "SLP" => "printf '\\x02\\x01\\x00\\x00\\x36\\x20\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x02\\x65\\x6e\\x00\\x00\\x00\\x15\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x3a\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x2d\\x61\\x67\\x65\\x6e\\x74\\x00\\x07\\x64\\x65\\x66\\x61\\x75\\x6c\\x74\\x00\\x00\\x00\\x00' | nc -u -w 3 <IP> 427".to_string(),
+                "MT4145" => format!("nmap -sT -pT:{} -Pn -n <IP>", port),
+                "MT5678" => format!("nmap -sT -pT:{} -Pn -n <IP>", port),
+                _ => {
+                    if protocol.to_lowercase() == "tcp" {
+                        format!("nc -w 3 <IP> {}", port)
+                    } else {
+                        format!("nc -u -w 3 <IP> {}", port)
+                    }
+                }
             };
 
             w.text("  Command:", SMALL_SIZE, SMALL_LH, true);
