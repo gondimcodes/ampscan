@@ -57,9 +57,18 @@ pub fn prompt_new_password() -> Result<String> {
 }
 
 /// Prompt the user for a password (for login).
+///
+/// # Security note
+/// When `AMPSCAN_PASS` is set, the password is readable by any process with the
+/// same UID via `/proc/<pid>/environ`. Prefer interactive login in multi-user
+/// environments. Use `AMPSCAN_PASS` only in isolated automation contexts.
 pub fn prompt_password() -> Result<String> {
     if let Ok(pass) = std::env::var("AMPSCAN_PASS") {
         if !pass.is_empty() {
+            eprintln!(
+                "⚠️  Using AMPSCAN_PASS for non-interactive login. \
+                 Ensure this environment variable is not exposed to untrusted processes."
+            );
             return Ok(pass);
         }
     }

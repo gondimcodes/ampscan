@@ -1,5 +1,5 @@
 use super::models::Prefix;
-use super::DbConn;
+use super::{lock_db, DbConn};
 use anyhow::{Context, Result};
 
 const SELECT_COLS: &str =
@@ -49,20 +49,20 @@ pub fn insert_prefix(conn: &DbConn, prefix: &str, description: &str) -> Result<i
         }
     }
 
-    let conn = conn.lock().unwrap();
-    conn.execute(
+    let c = lock_db(conn)?;
+    c.execute(
         "INSERT INTO prefixes (prefix, description, ip_version)
          VALUES (?1, ?2, ?3)",
         rusqlite::params![prefix, description, ip_version as i64],
     )
     .context("Failed to insert prefix (may already exist)")?;
-    Ok(conn.last_insert_rowid())
+    Ok(c.last_insert_rowid())
 }
 
 /// List all prefixes.
 pub fn list_prefixes(conn: &DbConn) -> Result<Vec<Prefix>> {
-    let conn = conn.lock().unwrap();
-    let mut stmt = conn
+    let c = lock_db(conn)?;
+    let mut stmt = c
         .prepare(&format!(
             "SELECT {} FROM prefixes ORDER BY ip_version, prefix",
             SELECT_COLS
@@ -77,8 +77,8 @@ pub fn list_prefixes(conn: &DbConn) -> Result<Vec<Prefix>> {
 
 /// Get only enabled prefixes.
 pub fn get_enabled_prefixes(conn: &DbConn) -> Result<Vec<Prefix>> {
-    let conn = conn.lock().unwrap();
-    let mut stmt = conn
+    let c = lock_db(conn)?;
+    let mut stmt = c
         .prepare(&format!(
             "SELECT {} FROM prefixes WHERE enabled != 0 ORDER BY ip_version, prefix",
             SELECT_COLS
@@ -93,9 +93,9 @@ pub fn get_enabled_prefixes(conn: &DbConn) -> Result<Vec<Prefix>> {
 
 /// Enable or disable a prefix by id.
 pub fn toggle_prefix(conn: &DbConn, id: i64, enabled: bool) -> Result<()> {
-    let conn = conn.lock().unwrap();
+    let c = lock_db(conn)?;
     let val = if enabled { 1 } else { 0 };
-    let rows = conn.execute(
+    let rows = c.execute(
         "UPDATE prefixes SET enabled = ?1, updated_at = datetime('now') WHERE id = ?2",
         rusqlite::params![val, id],
     )?;
@@ -119,8 +119,8 @@ pub fn update_prefix(
             .with_context(|| format!("Invalid CIDR prefix: '{}'", prefix))?;
         let ip_version: i64 = if net.addr().is_ipv4() { 4 } else { 6 };
 
-        let conn = conn.lock().unwrap();
-        conn.execute(
+        let c = lock_db(conn)?;
+        c.execute(
             "UPDATE prefixes SET prefix = ?1, ip_version = ?2, updated_at = datetime('now') WHERE id = ?3",
             rusqlite::params![prefix, ip_version, id],
         )?;
@@ -129,8 +129,8 @@ pub fn update_prefix(
         if desc.chars().count() > 255 {
             anyhow::bail!("Description is too long (maximum 255 characters allowed).");
         }
-        let conn = conn.lock().unwrap();
-        conn.execute(
+        let c = lock_db(conn)?;
+        c.execute(
             "UPDATE prefixes SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
             rusqlite::params![desc, id],
         )?;
@@ -140,8 +140,8 @@ pub fn update_prefix(
 
 /// Delete a prefix by id.
 pub fn delete_prefix(conn: &DbConn, id: i64) -> Result<()> {
-    let conn = conn.lock().unwrap();
-    let rows = conn.execute("DELETE FROM prefixes WHERE id = ?1", rusqlite::params![id])?;
+    let c = lock_db(conn)?;
+    let rows = c.execute("DELETE FROM prefixes WHERE id = ?1", rusqlite::params![id])?;
     if rows == 0 {
         anyhow::bail!("Prefix with id {} not found", id);
     }

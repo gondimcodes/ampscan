@@ -27,11 +27,35 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn load() -> Self {
-        match std::fs::read_to_string("config.toml") {
-            Ok(content) => toml::from_str(&content).unwrap_or_else(|_| Self::default()),
-            Err(_) => Self::default(),
+        find_config_file()
+            .and_then(|path| std::fs::read_to_string(&path).ok())
+            .and_then(|content| toml::from_str(&content).ok())
+            .unwrap_or_default()
+    }
+}
+
+/// Search for `config.toml` in priority order:
+/// 1. Directory containing the running executable (typical install layout)
+/// 2. Current working directory (development / explicit run-from-dir)
+///
+/// Returns `None` if neither location has the file, suppressing any error silently
+/// (missing config is a valid state — the tool works without it).
+fn find_config_file() -> Option<std::path::PathBuf> {
+    // 1. Alongside the binary
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let candidate = exe_dir.join("config.toml");
+            if candidate.exists() {
+                return Some(candidate);
+            }
         }
     }
+    // 2. Current working directory
+    let cwd = std::path::PathBuf::from("config.toml");
+    if cwd.exists() {
+        return Some(cwd);
+    }
+    None
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -212,14 +236,28 @@ fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
     lines
 }
 
-/// Truncate a string for display.
-#[allow(dead_code)]
-fn truncate(s: &str, max: usize) -> String {
+/// Truncate a string for display, counting Unicode scalar values (not bytes).
+/// Only used in tests; kept here close to wrap_text for documentation purposes.
+#[cfg(test)]
+fn truncate_str(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         s.to_string()
     } else {
         let truncated: String = s.chars().take(max.saturating_sub(3)).collect();
         format!("{}...", truncated)
+    }
+}
+
+// Ensure truncate_str is used at least in tests
+#[cfg(test)]
+mod truncate_tests {
+    use super::truncate_str;
+
+    #[test]
+    fn test_truncate_str() {
+        assert_eq!(truncate_str("hello world", 8), "hello...");
+        assert_eq!(truncate_str("hello", 10), "hello");
+        assert_eq!(truncate_str("", 5), "");
     }
 }
 

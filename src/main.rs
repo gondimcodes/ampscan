@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, Color, Table};
+use ipnet::IpNet;
 use std::io::{self, Write};
 use std::net::IpAddr;
 use std::time::Duration;
@@ -263,8 +264,11 @@ fn open_and_auth(cli: &Cli) -> Result<DbConn> {
         anyhow::bail!("Database not initialized. Run 'ampscan init' first.");
     }
 
-    let key = db::get_db_key()?;
+    let mut key = db::get_db_key()?;
     let db = db::open_database(&cli.db_path, &key)?;
+    // Zeroize our copy of the key from the heap immediately after the connection is open.
+    // SQLCipher has already copied it into its internal cipher state.
+    db::zeroize_key(&mut key);
 
     // Check if initialized
     if !user_repo::has_users(&db)? {
@@ -302,25 +306,12 @@ fn prompt_username() -> Result<String> {
     Ok(username)
 }
 
-/// Parse hex string to bytes (e.g., "FF0102" -> [0xFF, 0x01, 0x02]).
-#[allow(dead_code)]
-fn hex_to_bytes(hex: &str) -> Result<Vec<u8>> {
-    let hex = hex.trim().replace(' ', "");
-    if hex.len() % 2 != 0 {
-        anyhow::bail!("Hex string must have even length");
-    }
-    (0..hex.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).context("Invalid hex digit"))
-        .collect()
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Command: init
 // ═══════════════════════════════════════════════════════════════════════════
 
 async fn cmd_init(cli: &Cli) -> Result<()> {
-    let key = db::get_db_key()?;
+    let mut key = db::get_db_key()?;
 
     println!("{}", "Initializing database...".cyan());
 
@@ -332,6 +323,7 @@ async fn cmd_init(cli: &Cli) -> Result<()> {
     }
 
     let db = db::open_database(&cli.db_path, &key)?;
+    db::zeroize_key(&mut key);
 
     // Seed default ports
     port_repo::seed_default_ports(&db)?;
@@ -592,11 +584,42 @@ async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
 
             let prefixes = match prefix {
                 Some(p) => {
+                    // Validate the manually provided --prefix early, before
+                    // any network activity, to give immediate feedback.
+                    let net: IpNet = p
+                        .parse()
+                        .with_context(|| format!("Invalid CIDR prefix: '{}'", p))?;
+
+                    // Enforce the same size limits as the DB-registered prefixes
+                    match &net {
+                        IpNet::V4(net4) => {
+                            let start: u32 = net4.network().into();
+                            let end: u32 = net4.broadcast().into();
+                            let count = (end as u64 - start as u64 + 1) as usize;
+                            if count > 65_536 {
+                                anyhow::bail!(
+                                    "Prefix {} is too large ({} hosts). Maximum is 65536 (/16).",
+                                    p,
+                                    count
+                                );
+                            }
+                        }
+                        IpNet::V6(net6) => {
+                            if net6.prefix_len() < 112 {
+                                anyhow::bail!(
+                                    "IPv6 prefix /{} is too large. Maximum allowed is /112.",
+                                    net6.prefix_len()
+                                );
+                            }
+                        }
+                    }
+
+                    let ip_version: u8 = if net.addr().is_ipv4() { 4 } else { 6 };
                     vec![ampscan::db::models::Prefix {
                         id: 0,
                         prefix: p.clone(),
                         description: "Manual prefix".to_string(),
-                        ip_version: if p.contains(':') { 6 } else { 4 },
+                        ip_version,
                         enabled: true,
                         created_at: "".to_string(),
                         updated_at: "".to_string(),
