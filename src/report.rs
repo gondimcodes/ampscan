@@ -638,14 +638,14 @@ pub fn generate_pdf(
                 "TFTP" => "tftp <IP> -c get a.pdf".to_string(),
                 "CHARGEN" => {
                     if protocol.to_lowercase() == "tcp" {
-                        "nc -w 3 <IP> 19".to_string()
+                        "nmap -sT -pT:19 -Pn -n <IP>".to_string()
                     } else {
                         "nmap -sU -pU:19 -Pn -n <IP>".to_string()
                     }
                 }
                 "QOTD" => {
                     if protocol.to_lowercase() == "tcp" {
-                        "nc -w 3 <IP> 17".to_string()
+                        "nmap -sT -pT:17 -Pn -n <IP>".to_string()
                     } else {
                         "nmap -sU -pU:17 -Pn -n <IP>".to_string()
                     }
@@ -655,7 +655,7 @@ pub fn generate_pdf(
                 "MT5678" => format!("nmap -sT -pT:{} -Pn -n <IP>", port),
                 _ => {
                     if protocol.to_lowercase() == "tcp" {
-                        format!("nc -w 3 <IP> {}", port)
+                        format!("nmap -sT -pT:{} -Pn -n <IP>", port)
                     } else {
                         format!("nmap -sU -pU:{} -Pn -n <IP>", port)
                     }
