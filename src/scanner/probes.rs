@@ -16,19 +16,18 @@ pub async fn execute_probe(
     ip: IpAddr,
     port_config: &Port,
     timeout: Duration,
-    use_icmp: bool,
     retries: usize,
 ) -> ProbeResult {
     let start = Instant::now();
 
     let status = match port_config.protocol.as_str() {
-        "tcp" => execute_tcp_probe(ip, port_config.port, timeout, use_icmp).await,
+        "tcp" => execute_tcp_probe(ip, port_config.port, timeout).await,
         "udp" => {
             if port_config.probe_type == "dns" {
-                execute_dns_probe(ip, port_config.port, timeout, use_icmp, retries).await
+                execute_dns_probe(ip, port_config.port, timeout, retries).await
             } else {
                 let payload = build_payload(&port_config.probe_type, port_config.probe_payload.as_deref());
-                execute_udp_probe(ip, port_config.port, &payload, timeout, use_icmp, retries).await
+                execute_udp_probe(ip, port_config.port, &payload, timeout, retries).await
             }
         }
         other => PortStatus::Error(format!("Unknown protocol: {}", other)),
@@ -56,7 +55,6 @@ async fn execute_dns_probe(
     ip: IpAddr,
     port: u16,
     timeout: Duration,
-    _use_icmp: bool,
     retries: usize,
 ) -> PortStatus {
     let payload = build_dns_payload();
@@ -92,7 +90,6 @@ async fn execute_udp_probe(
     port: u16,
     payload: &[u8],
     timeout: Duration,
-    _use_icmp: bool,
     retries: usize,
 ) -> PortStatus {
     match send_udp_probe(ip, port, payload, timeout, retries).await {
@@ -122,9 +119,9 @@ async fn send_udp_probe(
     };
 
     let max_attempts = retries + 1;
-    let attempt_timeout = Duration::from_millis(
-        (timeout.as_millis() as u64 / 2).max(1000)
-    );
+    // Each attempt gets the full declared timeout. The --timeout flag means
+    // "wait this long per attempt", not "split this across retries".
+    let attempt_timeout = timeout;
     let mut last_err = None;
 
     for attempt in 1..=max_attempts {
@@ -180,7 +177,6 @@ async fn execute_tcp_probe(
     ip: IpAddr,
     port: u16,
     timeout: Duration,
-    _use_icmp: bool,
 ) -> PortStatus {
     let dest = SocketAddr::new(ip, port);
     match tokio::time::timeout(timeout, TcpStream::connect(dest)).await {

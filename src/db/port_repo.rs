@@ -2,7 +2,7 @@
 //!
 //! Handles all SQLite database operations for amplification ports.
 use super::models::Port;
-use super::DbConn;
+use super::{lock_db, DbConn};
 use anyhow::{Context, Result};
 
 /// Helper to map a rusqlite Row to a Port struct.
@@ -34,20 +34,20 @@ pub fn insert_port(
     probe_type: &str,
     probe_payload: Option<&[u8]>,
 ) -> Result<i64> {
-    let conn = conn.lock().unwrap();
-    conn.execute(
+    let c = lock_db(conn)?;
+    c.execute(
         "INSERT INTO ports (port, protocol, name, description, probe_type, probe_payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         rusqlite::params![port as i64, protocol, name, description, probe_type, probe_payload],
     )
     .context("Failed to insert port (may already exist with same port/protocol)")?;
-    Ok(conn.last_insert_rowid())
+    Ok(c.last_insert_rowid())
 }
 
 /// List all ports, ordered by port number.
 pub fn list_ports(conn: &DbConn) -> Result<Vec<Port>> {
-    let conn = conn.lock().unwrap();
-    let mut stmt = conn
+    let c = lock_db(conn)?;
+    let mut stmt = c
         .prepare(&format!("SELECT {} FROM ports ORDER BY port, protocol", SELECT_COLS))
         .context("Failed to prepare port list query")?;
     let ports = stmt
@@ -59,8 +59,8 @@ pub fn list_ports(conn: &DbConn) -> Result<Vec<Port>> {
 
 /// Get only enabled ports, ordered by port number.
 pub fn get_enabled_ports(conn: &DbConn) -> Result<Vec<Port>> {
-    let conn = conn.lock().unwrap();
-    let mut stmt = conn
+    let c = lock_db(conn)?;
+    let mut stmt = c
         .prepare(&format!(
             "SELECT {} FROM ports WHERE enabled != 0 ORDER BY port, protocol",
             SELECT_COLS
@@ -75,9 +75,9 @@ pub fn get_enabled_ports(conn: &DbConn) -> Result<Vec<Port>> {
 
 /// Enable or disable a port by id.
 pub fn toggle_port(conn: &DbConn, id: i64, enabled: bool) -> Result<()> {
-    let conn = conn.lock().unwrap();
+    let c = lock_db(conn)?;
     let val = if enabled { 1 } else { 0 };
-    let rows = conn.execute(
+    let rows = c.execute(
         "UPDATE ports SET enabled = ?1, updated_at = datetime('now') WHERE id = ?2",
         rusqlite::params![val, id],
     )?;
@@ -94,15 +94,15 @@ pub fn update_port(
     name: Option<&str>,
     description: Option<&str>,
 ) -> Result<()> {
-    let conn = conn.lock().unwrap();
+    let c = lock_db(conn)?;
     if let Some(name) = name {
-        conn.execute(
+        c.execute(
             "UPDATE ports SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
             rusqlite::params![name, id],
         )?;
     }
     if let Some(desc) = description {
-        conn.execute(
+        c.execute(
             "UPDATE ports SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
             rusqlite::params![desc, id],
         )?;
@@ -112,8 +112,8 @@ pub fn update_port(
 
 /// Delete a port by id.
 pub fn delete_port(conn: &DbConn, id: i64) -> Result<()> {
-    let conn = conn.lock().unwrap();
-    let rows = conn.execute("DELETE FROM ports WHERE id = ?1", rusqlite::params![id])?;
+    let c = lock_db(conn)?;
+    let rows = c.execute("DELETE FROM ports WHERE id = ?1", rusqlite::params![id])?;
     if rows == 0 {
         anyhow::bail!("Port with id {} not found", id);
     }
@@ -125,7 +125,7 @@ pub fn delete_port(conn: &DbConn, id: i64) -> Result<()> {
 pub fn seed_default_ports(conn: &DbConn) -> Result<()> {
     // Check if already seeded
     {
-        let c = conn.lock().unwrap();
+        let c = lock_db(conn)?;
         let count: i64 = c.query_row("SELECT COUNT(*) FROM ports", [], |row| row.get(0))?;
         if count > 0 {
             return Ok(());
