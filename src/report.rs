@@ -154,8 +154,8 @@ impl PdfWriter {
 
     /// Save the document to a file.
     fn save(self, path: &str) -> Result<()> {
-        let file = File::create(path)
-            .with_context(|| format!("Failed to create PDF file: {}", path))?;
+        let file =
+            File::create(path).with_context(|| format!("Failed to create PDF file: {}", path))?;
         self.doc
             .save(&mut BufWriter::new(file))
             .context("Failed to write PDF content")?;
@@ -247,14 +247,28 @@ pub fn generate_pdf(
                     let file = File::open(logo_path)?;
                     let reader = std::io::BufReader::new(file);
                     let img_reader = ::image::io::Reader::new(reader).with_guessed_format()?;
-                    let format = img_reader.format().ok_or_else(|| anyhow::anyhow!("Undetected image format"))?;
+                    let format = img_reader
+                        .format()
+                        .ok_or_else(|| anyhow::anyhow!("Undetected image format"))?;
 
                     match format {
                         ::image::ImageFormat::Png => {
                             let dynamic_img = ::image::open(logo_path)?;
-                            let (width, height) = <::image::DynamicImage as ::image::GenericImageView>::dimensions(&dynamic_img);
-                            let mut white_bg = ::image::ImageBuffer::from_pixel(width, height, ::image::Rgba([255u8, 255u8, 255u8, 255u8]));
-                            ::image::imageops::overlay(&mut white_bg, &dynamic_img.to_rgba8(), 0, 0);
+                            let (width, height) =
+                                <::image::DynamicImage as ::image::GenericImageView>::dimensions(
+                                    &dynamic_img,
+                                );
+                            let mut white_bg = ::image::ImageBuffer::from_pixel(
+                                width,
+                                height,
+                                ::image::Rgba([255u8, 255u8, 255u8, 255u8]),
+                            );
+                            ::image::imageops::overlay(
+                                &mut white_bg,
+                                &dynamic_img.to_rgba8(),
+                                0,
+                                0,
+                            );
 
                             let rgb_img = ::image::DynamicImage::ImageRgba8(white_bg).into_rgb8();
 
@@ -263,12 +277,14 @@ pub fn generate_pdf(
                             buffer.set_position(0);
 
                             let decoder = ::image::codecs::png::PngDecoder::new(buffer)?;
-                            Image::try_from(decoder).map_err(|e| anyhow::anyhow!("PNG error: {:?}", e))
+                            Image::try_from(decoder)
+                                .map_err(|e| anyhow::anyhow!("PNG error: {:?}", e))
                         }
                         ::image::ImageFormat::Jpeg => {
                             let mut file = File::open(logo_path)?;
                             let decoder = ::image::codecs::jpeg::JpegDecoder::new(&mut file)?;
-                            Image::try_from(decoder).map_err(|e| anyhow::anyhow!("JPEG error: {:?}", e))
+                            Image::try_from(decoder)
+                                .map_err(|e| anyhow::anyhow!("JPEG error: {:?}", e))
                         }
                         _ => anyhow::bail!("Unsupported image format: {:?}", format),
                     }
@@ -279,7 +295,7 @@ pub fn generate_pdf(
                         let scale = company.logo_scale.unwrap_or(0.15);
                         let logo_height = scale * 30.0; // Dynamic spacing calculation
                         w.ensure_space(logo_height + 5.0);
-                        
+
                         image.add_to_layer(
                             w.current_layer.clone(),
                             ImageTransform {
@@ -318,7 +334,12 @@ pub fn generate_pdf(
         }
         if let Some(rec) = recipient {
             w.skip(2.0);
-            w.text(&format!("Recipient: {}", rec), SUBHEADING_SIZE, SUBHEADING_LH, true);
+            w.text(
+                &format!("Recipient: {}", rec),
+                SUBHEADING_SIZE,
+                SUBHEADING_LH,
+                true,
+            );
         }
         w.skip(5.0);
         w.hline();
@@ -338,7 +359,12 @@ pub fn generate_pdf(
 
     // Client metadata
     if let Some(client) = client_name {
-        w.text(&format!("Client: {}", client), SUBHEADING_SIZE, SUBHEADING_LH, true);
+        w.text(
+            &format!("Client: {}", client),
+            SUBHEADING_SIZE,
+            SUBHEADING_LH,
+            true,
+        );
         w.skip(5.0);
     }
 
@@ -352,7 +378,9 @@ pub fn generate_pdf(
 
     // Emission Date and Time with timezone (Local)
     let emission_time = chrono::Local::now();
-    let emission_str = emission_time.format("%d/%m/%Y %H:%M:%S %Z (UTC%z)").to_string();
+    let emission_str = emission_time
+        .format("%d/%m/%Y %H:%M:%S %Z (UTC%z)")
+        .to_string();
     w.text(
         &format!("Emission Date: {}", emission_str),
         BODY_SIZE,
@@ -395,7 +423,6 @@ pub fn generate_pdf(
         false,
     );
 
-
     // ── Executive Summary ──────────────────────────────────────────
     w.skip(15.0);
     w.text("Executive Summary", HEADING_SIZE, HEADING_LH, true);
@@ -411,10 +438,7 @@ pub fn generate_pdf(
         true,
     );
     w.text(
-        &format!(
-            "IPs with at least one vulnerable port: {}",
-            vuln_ips.len()
-        ),
+        &format!("IPs with at least one vulnerable port: {}", vuln_ips.len()),
         SUBHEADING_SIZE,
         SUBHEADING_LH,
         true,
@@ -434,7 +458,12 @@ pub fn generate_pdf(
 
     // ── Breakdown by Service ───────────────────────────────────────
     w.skip(10.0);
-    w.text("Distribution by Service", SUBHEADING_SIZE, SUBHEADING_LH, true);
+    w.text(
+        "Distribution by Service",
+        SUBHEADING_SIZE,
+        SUBHEADING_LH,
+        true,
+    );
     w.skip(3.0);
 
     let by_service = report.vulnerable_by_service();
@@ -510,12 +539,7 @@ pub fn generate_pdf(
 
     // ── Per-IP Detail Section ──────────────────────────────────────
     w.new_page();
-    w.text(
-        "Vulnerable IP Details",
-        HEADING_SIZE,
-        HEADING_LH,
-        true,
-    );
+    w.text("Vulnerable IP Details", HEADING_SIZE, HEADING_LH, true);
     w.hline();
 
     for vuln_ip in &vuln_ips {
@@ -566,7 +590,12 @@ pub fn generate_pdf(
 
     if !open_services.is_empty() {
         w.new_page();
-        w.text("Manual Validation Procedures", HEADING_SIZE, HEADING_LH, true);
+        w.text(
+            "Manual Validation Procedures",
+            HEADING_SIZE,
+            HEADING_LH,
+            true,
+        );
         w.hline();
         w.text(
             "To manually verify the identified amplification ports, you can execute the following commands from a terminal:",
@@ -578,8 +607,13 @@ pub fn generate_pdf(
 
         for (service, port, protocol) in &open_services {
             w.ensure_space(BODY_LH * 5.0 + 4.0);
-            w.text(&format!("* Service: {}", service), SUBHEADING_SIZE, SUBHEADING_LH, true);
-            
+            w.text(
+                &format!("* Service: {}", service),
+                SUBHEADING_SIZE,
+                SUBHEADING_LH,
+                true,
+            );
+
             let command = match service.to_uppercase().as_str() {
                 "DNS" => "dig +short -t ANY google.com @<IP>".to_string(),
                 "SNMP" => "snmpget -v 2c -c public <IP> iso.3.6.1.2.1.1.1.0".to_string(),
@@ -606,14 +640,14 @@ pub fn generate_pdf(
                     if protocol.to_lowercase() == "tcp" {
                         "nc -w 3 <IP> 19".to_string()
                     } else {
-                        "nc -u -w 3 <IP> 19".to_string()
+                        "nmap -sU -pU:19 -Pn -n <IP>".to_string()
                     }
                 }
                 "QOTD" => {
                     if protocol.to_lowercase() == "tcp" {
                         "nc -w 3 <IP> 17".to_string()
                     } else {
-                        "nc -u -w 3 <IP> 17".to_string()
+                        "nmap -sU -pU:17 -Pn -n <IP>".to_string()
                     }
                 }
                 "SLP" => "printf '\\x02\\x01\\x00\\x00\\x36\\x20\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x02\\x65\\x6e\\x00\\x00\\x00\\x15\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x3a\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x2d\\x61\\x67\\x65\\x6e\\x74\\x00\\x07\\x64\\x65\\x66\\x61\\x75\\x6c\\x74\\x00\\x00\\x00\\x00' | nc -u -w 3 <IP> 427".to_string(),
@@ -623,7 +657,7 @@ pub fn generate_pdf(
                     if protocol.to_lowercase() == "tcp" {
                         format!("nc -w 3 <IP> {}", port)
                     } else {
-                        format!("nc -u -w 3 <IP> {}", port)
+                        format!("nmap -sU -pU:{} -Pn -n <IP>", port)
                     }
                 }
             };
