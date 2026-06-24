@@ -236,6 +236,77 @@ fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
     lines
 }
 
+/// Wrap a command string for PDF display.
+///
+/// Two-level strategy:
+/// 1. Word wrap at `max_chars` (break at spaces).
+/// 2. Character-level break as fallback for tokens with no spaces
+///    (e.g., long hex payloads like SLP's `\x02\x01...`).
+///
+/// Continuation lines are indented by `CONT_INDENT` spaces so it’s visually
+/// clear they belong to the same command.
+fn wrap_command(cmd: &str, max_chars: usize) -> Vec<String> {
+    const CONT_INDENT: &str = "    "; // 4-space continuation indent
+    let cont_max = max_chars.saturating_sub(CONT_INDENT.len());
+
+    let mut result: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    for word in cmd.split_whitespace() {
+        // Decide the effective limit for the current line
+        let limit = if result.is_empty() && current.is_empty() {
+            max_chars
+        } else {
+            cont_max
+        };
+
+        if word.chars().count() > max_chars {
+            // Long token with no spaces (e.g., hex payload): break char by char
+            let mut remaining: &str = word;
+            while !remaining.is_empty() {
+                let avail = if current.is_empty() { limit } else { limit.saturating_sub(current.len() + 1) };
+                if avail == 0 || (!current.is_empty() && current.len() + 1 + remaining.chars().take(1).count() > limit) {
+                    result.push(current.clone());
+                    current = CONT_INDENT.to_string();
+                }
+                let take: usize = remaining.chars().count().min(if current.trim().is_empty() { cont_max } else { cont_max.saturating_sub(current.len()) });
+                if take == 0 {
+                    break;
+                }
+                let chunk: String = remaining.chars().take(take).collect();
+                let byte_len = chunk.len();
+                if !current.trim().is_empty() {
+                    current.push(' ');
+                }
+                current.push_str(&chunk);
+                remaining = &remaining[byte_len..];
+                if !remaining.is_empty() {
+                    result.push(current.clone());
+                    current = CONT_INDENT.to_string();
+                }
+            }
+        } else if !current.is_empty() && current.len() + 1 + word.len() > limit {
+            // Word doesn't fit on current line — start continuation line
+            result.push(current.clone());
+            current = format!("{}{}", CONT_INDENT, word);
+        } else {
+            // Word fits
+            if !current.is_empty() {
+                current.push(' ');
+            }
+            current.push_str(word);
+        }
+    }
+
+    if !current.trim().is_empty() {
+        result.push(current);
+    }
+    if result.is_empty() {
+        result.push(String::new());
+    }
+    result
+}
+
 /// Truncate a string for display, counting Unicode scalar values (not bytes).
 /// Only used in tests; kept here close to wrap_text for documentation purposes.
 #[cfg(test)]
@@ -258,6 +329,52 @@ mod truncate_tests {
         assert_eq!(truncate_str("hello world", 8), "hello...");
         assert_eq!(truncate_str("hello", 10), "hello");
         assert_eq!(truncate_str("", 5), "");
+    }
+}
+
+#[cfg(test)]
+mod wrap_command_tests {
+    use super::wrap_command;
+
+    #[test]
+    fn test_short_command_no_wrap() {
+        let lines = wrap_command("dig +short -t ANY google.com @<IP>", 100);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "dig +short -t ANY google.com @<IP>");
+    }
+
+    #[test]
+    fn test_word_wrap_at_spaces() {
+        let lines = wrap_command("word1 word2 word3 word4", 12);
+        assert!(lines.len() > 1, "should wrap into multiple lines");
+        for line in lines.iter().skip(1) {
+            assert!(line.starts_with("    "), "continuation must be indented: {:?}", line);
+        }
+    }
+
+    #[test]
+    fn test_slp_long_hex_token_wraps() {
+        // Simulate a single long token with no spaces (like SLP's hex payload string).
+        // The token is 120 'a' chars — wider than max_chars=100 — to verify char-level fallback.
+        let long_token = "a".repeat(120);
+        let slp = format!("  printf '{}' | nc -u -w 3 <IP> 427", long_token);
+        let lines = wrap_command(&slp, 100);
+        assert!(lines.len() > 1, "long token must wrap: got {:?}", lines);
+        for line in &lines {
+            assert!(
+                line.chars().count() <= 100,
+                "line too long ({} chars): {:?}",
+                line.chars().count(),
+                line
+            );
+        }
+    }
+
+    #[test]
+    fn test_empty_command() {
+        let lines = wrap_command("", 100);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].is_empty());
     }
 }
 
@@ -676,8 +793,19 @@ pub fn generate_pdf(
                 }
             };
 
+            // Wrap the command — two-level strategy:
+            // (1) word wrap at spaces, (2) char-level break for long tokens
+            // without spaces (e.g., hex payloads like SLP's \x02\x01...).
+            // CMD_MAX_CHARS is calibrated for SMALL_SIZE (8pt) Helvetica at 170mm usable width.
+            const CMD_MAX_CHARS: usize = 100;
+            let cmd_lines = wrap_command(&format!("  {}", command), CMD_MAX_CHARS);
+            let cmd_block_height = SMALL_LH * (cmd_lines.len() as f32) + SUBHEADING_LH + 6.0;
+            w.ensure_space(cmd_block_height);
+
             w.text("  Command:", SMALL_SIZE, SMALL_LH, true);
-            w.text(&format!("  {}", command), SMALL_SIZE, SMALL_LH, false);
+            for line in &cmd_lines {
+                w.text(line, SMALL_SIZE, SMALL_LH, false);
+            }
             w.skip(3.0);
         }
     }
