@@ -28,6 +28,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up MSVC Developer Command Prompt (for OpenSSL build on Windows)
+        if: matrix.job.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
