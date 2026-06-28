@@ -1,0 +1,71 @@
+name: CD (Automatic Release)
+
+on:
+  push:
+    tags:
+      - 'v*' # Dispara quando uma tag começando com v é criada (ex: v1.3.1)
+
+permissions:
+  contents: write # Permissão necessária para publicar na aba de Releases
+
+jobs:
+  build-and-release:
+    name: Build and Release for ${{ matrix.job.target }}
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      matrix:
+        job:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: ampscan
+            asset_ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: ampscan.exe
+            asset_ext: zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.job.target }}
+
+      - name: Install Windows build dependencies (OpenSSL source requirements)
+        if: matrix.job.os == 'windows-latest'
+        shell: bash
+        run: |
+          # openssl-src precisa de Perl e NASM no Windows
+          choco install nasm -y
+          echo "C:\Program Files\NASM" >> $GITHUB_PATH
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.job.target }}
+
+      - name: Package binary (Linux)
+        if: matrix.job.os == 'ubuntu-latest'
+        run: |
+          cd target/${{ matrix.job.target }}/release
+          tar -czf ../../../${{ matrix.job.binary_name }}-${{ github.ref_name }}-${{ matrix.job.target }}.${{ matrix.job.asset_ext }} ${{ matrix.job.binary_name }}
+          cd -
+
+      - name: Package binary (Windows)
+        if: matrix.job.os == 'windows-latest'
+        shell: bash
+        run: |
+          cd target/${{ matrix.job.target }}/release
+          7z a ../../../${{ matrix.job.binary_name }}-${{ github.ref_name }}-${{ matrix.job.target }}.${{ matrix.job.asset_ext }} ${{ matrix.job.binary_name }}
+          cd -
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ampscan-${{ github.ref_name }}-*.tar.gz
+            ampscan-${{ github.ref_name }}-*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
