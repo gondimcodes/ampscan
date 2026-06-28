@@ -70,15 +70,15 @@ jobs:
           perl-version: '5.38'
           distribution: strawberry
 
-      - name: Build release binary
+      - name: Build release binary (standard)
+        if: "!matrix.job.use_cross"
         env:
           OPENSSL_RUST_USE_NASM: "0"
-        run: |
-          if [ "${{ matrix.job.use_cross }}" = "true" ]; then
-            cross build --release --target ${{ matrix.job.target }}
-          else
-            cargo build --release --target ${{ matrix.job.target }}
-          fi
+        run: cargo build --release --target ${{ matrix.job.target }}
+
+      - name: Build release binary (cross)
+        if: matrix.job.use_cross
+        run: cross build --release --target ${{ matrix.job.target }}
 
       - name: Package binary (Unix)
         if: startsWith(matrix.job.os, 'ubuntu') || startsWith(matrix.job.os, 'macos')
