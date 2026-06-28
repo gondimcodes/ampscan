@@ -163,3 +163,35 @@ During each port scan, the status can be classified as:
 2.  🟢 **Closed:** The host responded to at least one of the active probes, but the amplification service on this specific port yielded no response.
 3.  🔵 **Inconclusive:** The tested host did not respond to any of the sent probes, suggesting the host might be offline or entirely blocking diagnostic traffic.
 4.  🟡 **Protected:** The port is open, but it is not vulnerable.
+
+---
+
+## 🚀 Continuous Integration and Delivery (CI/CD)
+
+AmpScan includes automated pipelines powered by **GitHub Actions** to guarantee code quality and automate the deployment of stable releases.
+
+### 1. Continuous Integration (CI) — Validation
+The [CI Workflow](file:///.github/workflows/ci.yml) is triggered automatically on every `push` or `pull_request` targeting the `main` branch. 
+
+*   **Platform:** Matrix of `ubuntu-latest` (Linux x86_64) and `macos-latest` (macOS Apple Silicon / ARM64).
+*   **Steps:**
+    1.  Clones the code repository.
+    2.  Installs the latest stable Rust toolchain.
+    3.  Caches Cargo registries and target directories to optimize future runs.
+    4.  Runs `cargo check` to validate code correctness and types.
+    5.  Runs `cargo test --verbose` to execute all automated unit and integration tests.
+
+### 2. Continuous Delivery (CD) — Automatic Multi-Platform Release
+The [CD Workflow](file:///.github/workflows/release.yml) is triggered whenever a tag starting with `v` is pushed to GitHub (e.g. `v1.3.1`).
+
+*   **Matrix Strategy:**
+    *   **Linux (`x86_64-unknown-linux-gnu`)**: Built on `ubuntu-latest` (x86_64) and packaged as a `.tar.gz` archive.
+    *   **Linux ARM64 (`aarch64-unknown-linux-gnu`)**: Built on native `ubuntu-24.04-arm64` and packaged as a `.tar.gz` archive.
+    *   **Windows (`x86_64-pc-windows-msvc`)**: Built on `windows-latest` using Strawberry Perl and MSVC Developer Command Prompt to statically compile SQLCipher and OpenSSL, packaged as a `.zip` archive.
+    *   **macOS ARM64 (`aarch64-apple-darwin`)**: Built on `macos-latest` (Apple Silicon) and packaged as a `.tar.gz` archive.
+    *   **macOS Intel (`x86_64-apple-darwin`)**: Cross-compiled on `macos-latest` and packaged as a `.tar.gz` archive.
+    *   **FreeBSD (`x86_64-unknown-freebsd`)**: Built inside a native FreeBSD 14.x VM (`vmactions/freebsd-vm@v1`) hosted on `ubuntu-latest` and packaged as a `.tar.gz` archive.
+*   **Publishing:**
+    *   The workflow automatically bundles the binary artifacts.
+    *   Creates a new GitHub Release corresponding to the pushed tag version.
+    *   Uploads the archived binaries as assets to the release page.
