@@ -12,11 +12,14 @@ clap = { version = "4", features = ["derive", "env"] }
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
-# Encrypted database (SQLCipher = AES-256)
-rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
-
 # Password hashing (Argon2id)
 argon2 = "0.5"
+
+[target.'cfg(windows)'.dependencies]
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+[target.'cfg(not(windows))'.dependencies]
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
 
 # IP prefix/CIDR handling
 ipnet = "2"
