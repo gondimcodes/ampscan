@@ -33,15 +33,16 @@ jobs:
         with:
           target: ${{ matrix.job.target }}
 
-      - name: Install Windows build dependencies (OpenSSL source requirements)
+      - name: Set up Perl (for OpenSSL build on Windows)
         if: matrix.job.os == 'windows-latest'
-        shell: bash
-        run: |
-          # openssl-src precisa de Perl e NASM no Windows
-          choco install nasm -y
-          echo "C:\Program Files\NASM" >> $GITHUB_PATH
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.38'
+          distribution: strawberry
 
       - name: Build release binary
+        env:
+          OPENSSL_RUST_USE_NASM: "0"
         run: cargo build --release --target ${{ matrix.job.target }}
 
       - name: Package binary (Linux)
