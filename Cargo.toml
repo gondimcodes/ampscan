@@ -57,5 +57,8 @@ zeroize = { version = "1", features = ["derive"] }
 [target.'cfg(windows)'.dependencies]
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
 
-[target.'cfg(not(windows))'.dependencies]
+[target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+[target.'cfg(all(not(windows), not(all(target_os = "linux", target_arch = "aarch64"))))'.dependencies]
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
