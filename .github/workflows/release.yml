@@ -53,7 +53,7 @@ jobs:
         if: matrix.job.os == 'ubuntu-latest'
         run: |
           cd target/${{ matrix.job.target }}/release
-          tar -czf ../../../${{ matrix.job.binary_name }}-${{ github.ref_name }}-${{ matrix.job.target }}.${{ matrix.job.asset_ext }} ${{ matrix.job.binary_name }}
+          tar -czf ../../../ampscan-${{ github.ref_name }}-${{ matrix.job.target }}.${{ matrix.job.asset_ext }} ${{ matrix.job.binary_name }}
           cd -
 
       - name: Package binary (Windows)
@@ -61,7 +61,7 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.job.target }}/release
-          7z a ../../../${{ matrix.job.binary_name }}-${{ github.ref_name }}-${{ matrix.job.target }}.${{ matrix.job.asset_ext }} ${{ matrix.job.binary_name }}
+          7z a ../../../ampscan-${{ github.ref_name }}-${{ matrix.job.target }}.${{ matrix.job.asset_ext }} ${{ matrix.job.binary_name }}
           cd -
 
       - name: Publish GitHub Release
