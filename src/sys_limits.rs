@@ -16,42 +16,45 @@ pub fn try_raise_fd_limit(required_concurrency: usize) -> Result<()> {
             return Err(anyhow::anyhow!("Failed to retrieve file descriptor limits (getrlimit)"));
         }
 
+        let rlim_cur = limits.rlim_cur as u64;
+        let rlim_max = limits.rlim_max as u64;
+
         // We need at least required_concurrency + extra padding for standard streams,
         // database connections, and libraries.
         let needed = (required_concurrency as u64) + 64;
 
-        if limits.rlim_cur < needed {
+        if rlim_cur < needed {
             // Cap at hard limit
-            let target_limit = needed.min(limits.rlim_max);
+            let target_limit = needed.min(rlim_max);
             
             let new_limits = rlimit {
-                rlim_cur: target_limit,
+                rlim_cur: target_limit as _,
                 rlim_max: limits.rlim_max,
             };
 
             if setrlimit(RLIMIT_NOFILE, &new_limits) != 0 {
                 // If it fails to set, warn the user if current soft limit is indeed insufficient
-                if limits.rlim_cur < needed {
+                if rlim_cur < needed {
                     eprintln!(
                         "⚠️  Warning: Failed to automatically raise file descriptor limit to {}.\n\
                          Current soft limit: {}, Hard limit: {}.\n\
                          You may hit 'Too many open files' error under high concurrency.\n\
                          Consider running 'ulimit -n 65536' in your shell.",
-                        needed, limits.rlim_cur, limits.rlim_max
+                        needed, rlim_cur, rlim_max
                     );
                 }
             } else {
                 eprintln!(
                     "🔧 Automatically raised file descriptor limit: {} -> {}",
-                    limits.rlim_cur, target_limit
+                    rlim_cur, target_limit
                 );
             }
-        } else if needed > limits.rlim_max {
+        } else if needed > rlim_max {
             eprintln!(
                 "⚠️  Warning: Requested concurrency ({}) requires around {} file descriptors, \
                  but the system hard limit is {}.\n\
                  You may hit resource exhaustion errors. Consider adjusting system limits.",
-                required_concurrency, needed, limits.rlim_max
+                required_concurrency, needed, rlim_max
             );
         }
     }
