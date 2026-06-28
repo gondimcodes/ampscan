@@ -107,6 +107,11 @@ jobs:
           prepare: |
             pkg install -y rust pkgconf openssl
           run: |
+            export CFLAGS="-I/usr/local/include"
+            export LDFLAGS="-L/usr/local/lib"
+            export OPENSSL_DIR="/usr/local"
+            export OPENSSL_LIB_DIR="/usr/local/lib"
+            export OPENSSL_INCLUDE_DIR="/usr/local/include"
             cargo build --release
             cd target/release
             tar -czf ../../ampscan-${{ github.ref_name }}-x86_64-unknown-freebsd.tar.gz ampscan
