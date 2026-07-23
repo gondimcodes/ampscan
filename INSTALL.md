@@ -2,6 +2,10 @@
 
 This guide walks you through installing the required dependencies and compiling AmpScan from source.
 
+## Pre-compiled Binaries
+
+If you are on Linux x86_64, you can skip compiling from source and download pre-compiled release binaries directly from the **Versões (Releases)** page on [Codeberg](https://codeberg.org/gondim/ampscan/releases).
+
 ## Prerequisites
 
 ### 1. Install Rust and Cargo
