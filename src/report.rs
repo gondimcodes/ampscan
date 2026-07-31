@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[allow(unused)]
 use printpdf::*;
 use std::fs::File;
-use std::io::BufWriter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompanyConfig {
@@ -94,43 +93,28 @@ const DESC_MAX_CHARS: usize = 55;
 // ═══════════════════════════════════════════════════════════════════════════
 
 struct PdfWriter {
-    doc: PdfDocumentReference,
-    font: IndirectFontRef,
-    font_bold: IndirectFontRef,
-    current_layer: PdfLayerReference,
+    doc: PdfDocument,
+    page_index: usize,
     /// Current Y position from the BOTTOM of the page (decreases as we add content)
     y: f32,
 }
 
 impl PdfWriter {
     fn new() -> Result<Self> {
-        let (doc, page, layer) = PdfDocument::new(
-            "AmpScan - DDoS Amplification Report",
-            Mm(PAGE_W),
-            Mm(PAGE_H),
-            "Content",
-        );
-        let font = doc
-            .add_builtin_font(BuiltinFont::Helvetica)
-            .context("Failed to add Helvetica font")?;
-        let font_bold = doc
-            .add_builtin_font(BuiltinFont::HelveticaBold)
-            .context("Failed to add Helvetica Bold font")?;
-        let current_layer = doc.get_page(page).get_layer(layer);
+        let mut doc = PdfDocument::new("AmpScan - DDoS Amplification Report");
+        doc.pages.push(PdfPage::new(Mm(PAGE_W), Mm(PAGE_H), vec![]));
 
         Ok(Self {
             doc,
-            font,
-            font_bold,
-            current_layer,
+            page_index: 0,
             y: PAGE_H - MARGIN,
         })
     }
 
     /// Create a new page and reset Y to the top.
     fn new_page(&mut self) {
-        let (page, layer) = self.doc.add_page(Mm(PAGE_W), Mm(PAGE_H), "Content");
-        self.current_layer = self.doc.get_page(page).get_layer(layer);
+        self.doc.pages.push(PdfPage::new(Mm(PAGE_W), Mm(PAGE_H), vec![]));
+        self.page_index = self.doc.pages.len() - 1;
         self.y = PAGE_H - MARGIN;
     }
 
@@ -144,17 +128,47 @@ impl PdfWriter {
     /// Write text at the current Y position, left-aligned at MARGIN.
     fn text(&mut self, text: &str, size: f32, line_h: f32, bold: bool) {
         self.ensure_space(line_h);
-        let font = if bold { &self.font_bold } else { &self.font };
-        self.current_layer
-            .use_text(sanitize(text), size, Mm(MARGIN), Mm(self.y), font);
+        let font = if bold {
+            PdfFontHandle::Builtin(BuiltinFont::HelveticaBold)
+        } else {
+            PdfFontHandle::Builtin(BuiltinFont::Helvetica)
+        };
+        let page = &mut self.doc.pages[self.page_index];
+        page.ops.push(Op::StartTextSection);
+        page.ops.push(Op::SetTextCursor {
+            pos: Point::new(Mm(MARGIN), Mm(self.y)),
+        });
+        page.ops.push(Op::SetFont {
+            font,
+            size: Pt(size),
+        });
+        page.ops.push(Op::ShowText {
+            items: vec![TextItem::Text(sanitize(text))],
+        });
+        page.ops.push(Op::EndTextSection);
         self.y -= line_h;
     }
 
     /// Write text at a specific X position (relative to page left), at current Y.
-    fn text_at(&self, text: &str, size: f32, x: f32, bold: bool) {
-        let font = if bold { &self.font_bold } else { &self.font };
-        self.current_layer
-            .use_text(sanitize(text), size, Mm(x), Mm(self.y), font);
+    fn text_at(&mut self, text: &str, size: f32, x: f32, bold: bool) {
+        let font = if bold {
+            PdfFontHandle::Builtin(BuiltinFont::HelveticaBold)
+        } else {
+            PdfFontHandle::Builtin(BuiltinFont::Helvetica)
+        };
+        let page = &mut self.doc.pages[self.page_index];
+        page.ops.push(Op::StartTextSection);
+        page.ops.push(Op::SetTextCursor {
+            pos: Point::new(Mm(x), Mm(self.y)),
+        });
+        page.ops.push(Op::SetFont {
+            font,
+            size: Pt(size),
+        });
+        page.ops.push(Op::ShowText {
+            items: vec![TextItem::Text(sanitize(text))],
+        });
+        page.ops.push(Op::EndTextSection);
     }
 
     /// Skip vertical space.
@@ -164,25 +178,23 @@ impl PdfWriter {
 
     /// Draw a horizontal line at the current Y position.
     fn hline(&mut self) {
-        let points = vec![
-            (Point::new(Mm(MARGIN), Mm(self.y)), false),
-            (Point::new(Mm(PAGE_W - MARGIN), Mm(self.y)), false),
-        ];
+        let page = &mut self.doc.pages[self.page_index];
         let line = Line {
-            points,
+            points: vec![
+                LinePoint { p: Point::new(Mm(MARGIN), Mm(self.y)), bezier: false },
+                LinePoint { p: Point::new(Mm(PAGE_W - MARGIN), Mm(self.y)), bezier: false },
+            ],
             is_closed: false,
         };
-        self.current_layer.add_line(line);
+        page.ops.push(Op::DrawLine { line });
         self.skip(5.0);
     }
 
     /// Save the document to a file.
     fn save(self, path: &str) -> Result<()> {
-        let file =
-            File::create(path).with_context(|| format!("Failed to create PDF file: {}", path))?;
-        self.doc
-            .save(&mut BufWriter::new(file))
-            .context("Failed to write PDF content")?;
+        let mut warnings = Vec::new();
+        let bytes = self.doc.save(&PdfSaveOptions::default(), &mut warnings);
+        std::fs::write(path, bytes).with_context(|| format!("Failed to create PDF file: {}", path))?;
         Ok(())
     }
 }
@@ -397,8 +409,7 @@ pub fn generate_pdf(
     if let Some(ref company) = config.company {
         if let Some(ref logo_path) = company.logo_path {
             if std::path::Path::new(logo_path).exists() {
-                // Try to load the image (PNG or JPEG)
-                let load_res = (|| -> Result<Image> {
+                let load_res = (|| -> Result<RawImage> {
                     let file = File::open(logo_path)?;
                     let reader = std::io::BufReader::new(file);
                     let img_reader = ::image::io::Reader::new(reader).with_guessed_format()?;
@@ -429,16 +440,15 @@ pub fn generate_pdf(
 
                             let mut buffer = std::io::Cursor::new(Vec::new());
                             rgb_img.write_to(&mut buffer, ::image::ImageFormat::Png)?;
-                            buffer.set_position(0);
-
-                            let decoder = ::image::codecs::png::PngDecoder::new(buffer)?;
-                            Image::try_from(decoder)
+                            let bytes = buffer.into_inner();
+                            let mut warnings = Vec::new();
+                            RawImage::decode_from_bytes(&bytes, &mut warnings)
                                 .map_err(|e| anyhow::anyhow!("PNG error: {:?}", e))
                         }
                         ::image::ImageFormat::Jpeg => {
-                            let mut file = File::open(logo_path)?;
-                            let decoder = ::image::codecs::jpeg::JpegDecoder::new(&mut file)?;
-                            Image::try_from(decoder)
+                            let bytes = std::fs::read(logo_path)?;
+                            let mut warnings = Vec::new();
+                            RawImage::decode_from_bytes(&bytes, &mut warnings)
                                 .map_err(|e| anyhow::anyhow!("JPEG error: {:?}", e))
                         }
                         _ => anyhow::bail!("Unsupported image format: {:?}", format),
@@ -446,21 +456,23 @@ pub fn generate_pdf(
                 })();
 
                 match load_res {
-                    Ok(image) => {
+                    Ok(raw_image) => {
                         let scale = company.logo_scale.unwrap_or(0.15);
                         let logo_height = scale * 30.0; // Dynamic spacing calculation
                         w.ensure_space(logo_height + 5.0);
 
-                        image.add_to_layer(
-                            w.current_layer.clone(),
-                            ImageTransform {
-                                translate_x: Some(Mm(MARGIN)),
-                                translate_y: Some(Mm(w.y - logo_height)),
+                        let image_id = w.doc.add_image(&raw_image);
+                        let page = &mut w.doc.pages[w.page_index];
+                        page.ops.push(Op::UseXobject {
+                            id: image_id,
+                            transform: XObjectTransform {
+                                translate_x: Some(Mm(MARGIN).into()),
+                                translate_y: Some(Mm(w.y - logo_height).into()),
                                 scale_x: Some(scale),
                                 scale_y: Some(scale),
                                 ..Default::default()
                             },
-                        );
+                        });
                         w.skip(logo_height + 5.0);
                         logo_rendered = true;
                     }
