@@ -1,80 +1,80 @@
-# Stack de Desenvolvimento e Tecnologia — AmpScan
+# Technology Stack & Architecture — AmpScan
 
-Este documento detalha a pilha tecnológica, bibliotecas, ferramentas de sistema e decisões técnicas que compõem o **ampscan** (v1.3.2).
-
----
-
-## 1. Linguagem e Runtime Principal
-
-* **Linguagem**: **Rust (Edição 2021)**
-  * **Motivação**: Garantia de segurança de memória sem overhead de *garbage collector*, prevenção de *data races* em concorrência massiva, previsibilidade de recursos e alta performance em operações I/O de rede.
-* **Runtime Assíncrono**: [`tokio 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L13) (`features = ["full"]`)
-  * **Uso**: Orquestração não-bloqueante de envio/recebimento de pacotes de rede (UDP e TCP), controle fino de concorrência concorrente via semáforos assíncronos (`tokio::sync::Semaphore`) e controle de cooperação entre threads (`yield_now`).
+This document provides a comprehensive overview of the technology stack, external crates, system libraries, and architectural decisions powering **ampscan** (v1.3.2).
 
 ---
 
-## 2. Banco de Dados e Segurança de Dados em Repouso
+## 1. Core Language & Runtime
 
-* **Mecanismo de Armazenamento**: **SQLite3 + SQLCipher** via [`rusqlite 0.32`](file:///home/gondim/projetos/ampscan/Cargo.toml#L58-L64)
-  * **Criptografia**: Cifragem transparente AES-256-CBC em repouso para todo o banco de dados contendo usuários, prefixos, portas e histórico de relatórios.
-  * **Build Estático/Cross-platform**: 
-    * No **Windows** e **Linux ARM64**: Compilado com a feature `bundled-sqlcipher-vendored-openssl` (compilação estática do SQLCipher e do OpenSSL).
-    * Nas demais plataformas Unix/Linux/macOS: Utiliza a feature `bundled-sqlcipher`.
-* **Derivação de Senhas & Autenticação**: [`argon2 0.5`](file:///home/gondim/projetos/ampscan/Cargo.toml#L16) (**Argon2id**)
-  * **Uso**: Algoritmo seguro de derivamento de chave e hashing de senhas dos administradores locais.
-* **Higiene de Memória na Heap**: [`zeroize 1.9`](file:///home/gondim/projetos/ampscan/Cargo.toml#L55)
-  * **Uso**: Sobrescrita imediata de chaves e senhas brutas na memória Heap (`AMPSCAN_DB_KEY`) assim que o banco criptografado é aberto, minimizando janelas de exposição em dumps de memória.
+* **Language**: **Rust (2021 Edition)**
+  * **Rationale**: Guarantees memory safety without garbage collection overhead, prevents data races during high-concurrency network scans, ensures predictable resource utilization, and delivers high-performance network I/O.
+* **Async Runtime**: [`tokio 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L13) (`features = ["full"]`)
+  * **Usage**: Non-blocking orchestration of packet transmission/reception (UDP & TCP), fine-grained concurrency control via asynchronous semaphores (`tokio::sync::Semaphore`), and thread yield management (`yield_now`).
 
 ---
 
-## 3. Interface de Linha de Comando (CLI) e UX
+## 2. Encrypted Database & Data-at-Rest Security
 
-* **Parser de Argumentos**: [`clap 4.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L10) (`features = ["derive", "env"]`)
-  * **Uso**: Declaração estruturada de subcomandos (`init`, `scan run`, `port list`, etc.), flags de controle (`--concurrency`, `--retries`, `--pdf`) e suporte a login não-interativo por variável de ambiente (`AMPSCAN_PASS`).
-* **Formatação de Tabelas**: [`comfy-table 7.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L49)
-  * **Uso**: Renderização de tabelas limpas com bordas e alinhamento no terminal para listagens de portas, blocos IP e relatórios sumarizados.
-* **Estilização e Cores**: [`colored 2.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L40)
-  * **Uso**: Destaque visual colorido por criticidade (ex: amarelo para status `Open/Protected`, verde/amarelo/vermelho para faixas de latência).
-* **Entrada Oculta de Senhas**: [`rpassword 7.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L43)
-  * **Uso**: Captura de senhas do administrador sem exibir eco de caracteres no terminal.
-
----
-
-## 4. Motor de Escaneamento e Protocolos de Rede
-
-* **Manipulação de Prefixos IP**: [`ipnet 2.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L19)
-  * **Uso**: Validação rigorosa de blocos CIDR (IPv4 e IPv6) e suporte a expansão iterativa completa de faixas.
-* **Sondas de Amplificação (Probes)**: Módulo interno [`src/scanner/probes.rs`](file:///home/gondim/projetos/ampscan/src/scanner/probes.rs)
-  * **Uso**: Construção manual e serialização de payloads binários de protocolo (DNS, NTP, SNMP, Memcached, SSDP, TFTP, LDAP, NetBIOS, SLP, RPC, MikroTik, etc.) enviados sobre sockets UDP/TCP nativos do Tokio.
+* **Storage Engine**: **SQLite3 + SQLCipher** via [`rusqlite 0.32`](file:///home/gondim/projetos/ampscan/Cargo.toml#L58-L64)
+  * **Encryption**: Transparent AES-256-CBC encryption at rest for the entire database (storing users, subnets, ports, and scan report history).
+  * **Static & Cross-Platform Builds**:
+    * On **Windows** & **Linux ARM64**: Built using `bundled-sqlcipher-vendored-openssl` (compiles SQLCipher and OpenSSL statically from source).
+    * On other Unix/Linux/macOS platforms: Built using `bundled-sqlcipher`.
+* **Password Hashing & Authentication**: [`argon2 0.5`](file:///home/gondim/projetos/ampscan/Cargo.toml#L16) (**Argon2id**)
+  * **Usage**: Secure password hashing and key derivation for local administrator authentication.
+* **Heap Memory Hygiene**: [`zeroize 1.9`](file:///home/gondim/projetos/ampscan/Cargo.toml#L55)
+  * **Usage**: Immediate zero-overwriting of raw encryption keys in heap memory (`AMPSCAN_DB_KEY`) right after opening the encrypted database, reducing memory dump exposure windows.
 
 ---
 
-## 5. Geração de Relatórios e Imagens
+## 3. Command Line Interface (CLI) & User Experience
 
-* **Motor de PDF**: [`printpdf 0.12`](file:///home/gondim/projetos/ampscan/Cargo.toml#L22) (`features = ["png", "jpeg"]`)
-  * **Uso**: Construção vetorial 2D dinâmica de documentos PDF sem dependências externas de sistema (como wkhtmltopdf ou bibliotecas C de terceiros).
-* **Processamento de Imagens**: [`image 0.24`](file:///home/gondim/projetos/ampscan/Cargo.toml#L23)
-  * **Uso**: Leitura, verificação de magic bytes (PNG/JPEG) e renderização dos logotipos customizados da empresa auditora no cabeçalho do PDF.
-
----
-
-## 6. Integração com Sistema Operacional e Sistema de Arquivos
-
-* **Ajuste de Limites do Sistema**: [`libc 0.2`](file:///home/gondim/projetos/ampscan/Cargo.toml#L52)
-  * **Uso**: Chamadas de sistema Unix (`rlimit`/`getrlimit`/`setrlimit`) para autorregulagem automática de descritores de arquivos de socket (*soft limit* para o *hard limit*), prevenindo erros de exaustão (`EMFILE`).
-* **Datas e Identificadores**: [`chrono 0.4`](file:///home/gondim/projetos/ampscan/Cargo.toml#L34) e [`uuid 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L46)
-  * **Uso**: Geração de datas formatadas para os relatórios e geração de UUIDv4 para identificação única das varreduras salvas.
-* **Configuração**: [`toml 0.8`](file:///home/gondim/projetos/ampscan/Cargo.toml#L28) e [`serde 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L26)
-  * **Uso**: Carregamento e serialização de arquivos de configuração locais (`config.toml`).
+* **Argument Parsing**: [`clap 4.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L10) (`features = ["derive", "env"]`)
+  * **Usage**: Declarative subcommand parsing (`init`, `scan run`, `port list`, etc.), execution flags (`--concurrency`, `--retries`, `--pdf`), and non-interactive automation support via environment variables (`AMPSCAN_PASS`).
+* **Table Formatting**: [`comfy-table 7.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L49)
+  * **Usage**: Rendering clean terminal tables with borders and alignment for port listings, IP subnets, and summary scan results.
+* **Console Styling**: [`colored 2.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L40)
+  * **Usage**: Color-coded output by severity (e.g., bold yellow for `Open/Protected` status, green/yellow/red for latency ranges).
+* **Masked Password Prompt**: [`rpassword 7.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L43)
+  * **Usage**: Capturing administrator passwords without echoing characters in the terminal.
 
 ---
 
-## 7. Infraestrutura de CI/CD e Build Multiplataforma
+## 4. Scanning Engine & Network Protocols
 
-* **Validação de Código (CI)**: GitHub Actions (`ci.yml`) testando `cargo check` e `cargo test` em ambientes Linux e macOS.
-* **Automação de Release (CD)**: GitHub Actions (`release.yml`) acionado por tags `v*` compilando binários estáticos para:
+* **IP Subnet Management**: [`ipnet 2.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L19)
+  * **Usage**: Strict validation and parsing of IPv4 and IPv6 CIDR blocks, supporting full range host expansion.
+* **Amplification Probes**: Internal module [`src/scanner/probes.rs`](file:///home/gondim/projetos/ampscan/src/scanner/probes.rs)
+  * **Usage**: Manual construction and serialization of binary protocol payloads (DNS, NTP, SNMP, Memcached, SSDP, TFTP, LDAP, NetBIOS, SLP, RPC, MikroTik, etc.) dispatched over Tokio UDP/TCP sockets.
+
+---
+
+## 5. Report Generation & Image Processing
+
+* **PDF Engine**: [`printpdf 0.12`](file:///home/gondim/projetos/ampscan/Cargo.toml#L22) (`features = ["png", "jpeg"]`)
+  * **Usage**: Low-level 2D vector PDF creation without third-party system dependencies (such as wkhtmltopdf or C graphics libraries).
+* **Image Processing**: [`image 0.24`](file:///home/gondim/projetos/ampscan/Cargo.toml#L23)
+  * **Usage**: Decoding, magic byte verification (PNG/JPEG), and rendering of auditor company logos in PDF headers.
+
+---
+
+## 6. Operating System Integration & System Limits
+
+* **Resource Limit Tuning**: [`libc 0.2`](file:///home/gondim/projetos/ampscan/Cargo.toml#L52)
+  * **Usage**: Unix system calls (`rlimit`/`getrlimit`/`setrlimit`) for automatic self-elevation of socket file descriptors (*soft limit* to *hard limit*), preventing file exhaustion errors (`EMFILE`).
+* **Timestamps & Identifiers**: [`chrono 0.4`](file:///home/gondim/projetos/ampscan/Cargo.toml#L34) and [`uuid 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L46)
+  * **Usage**: Date formatting in reports and generating UUIDv4 for unique scan session tracking.
+* **Configuration Deserialization**: [`toml 0.8`](file:///home/gondim/projetos/ampscan/Cargo.toml#L28) and [`serde 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L26)
+  * **Usage**: Parsing and managing local configuration settings (`config.toml`).
+
+---
+
+## 7. CI/CD Pipeline & Cross-Platform Infrastructure
+
+* **Continuous Integration (CI)**: GitHub Actions (`ci.yml`) running `cargo check` and `cargo test` across Linux and macOS environments.
+* **Continuous Delivery (CD)**: GitHub Actions (`release.yml`) triggered by `v*` tags to cross-compile static binaries for:
   * Linux x86_64 (`x86_64-unknown-linux-gnu`)
-  * Linux ARM64 (`aarch64-unknown-linux-gnu`) via ferramenta `cross` (Docker)
+  * Linux ARM64 (`aarch64-unknown-linux-gnu`) via `cross` (Docker container)
   * Windows x86_64 (`x86_64-pc-windows-msvc`)
   * macOS Intel & Apple Silicon (`x86_64-apple-darwin` / `aarch64-apple-darwin`)
   * FreeBSD x86_64 (`x86_64-unknown-freebsd`) via VM (`freebsd-vm`)
