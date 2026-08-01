@@ -69,12 +69,16 @@ This document provides a comprehensive overview of the technology stack, externa
 
 ---
 
-## 7. CI/CD Pipeline & Cross-Platform Infrastructure
+## 7. Multi-Platform CI/CD Infrastructure & Code Mirroring
 
-* **Continuous Integration (CI)**: GitHub Actions (`ci.yml`) running `cargo check` and `cargo test` across Linux and macOS environments.
-* **Continuous Delivery (CD)**: GitHub Actions (`release.yml`) triggered by `v*` tags to cross-compile static binaries for:
-  * Linux x86_64 (`x86_64-unknown-linux-gnu`)
-  * Linux ARM64 (`aarch64-unknown-linux-gnu`) via `cross` (Docker container)
-  * Windows x86_64 (`x86_64-pc-windows-msvc`)
-  * macOS Intel & Apple Silicon (`x86_64-apple-darwin` / `aarch64-apple-darwin`)
-  * FreeBSD x86_64 (`x86_64-unknown-freebsd`) via VM (`freebsd-vm`)
+* **GitHub Actions Workflows**:
+  * **Continuous Integration (`ci.yml`)**: Automated `cargo check` and `cargo test` runs across Linux and macOS runners on pushes and pull requests.
+  * **Continuous Delivery (`release.yml`)**: Multi-platform release automation triggered by `v*` tags to compile and publish static binary assets for:
+    * Linux x86_64 (`x86_64-unknown-linux-gnu`)
+    * Linux ARM64 (`aarch64-unknown-linux-gnu`) via `cross` (Docker container)
+    * Windows x86_64 (`x86_64-pc-windows-msvc`)
+    * macOS Intel & Apple Silicon (`x86_64-apple-darwin` / `aarch64-apple-darwin`)
+    * FreeBSD x86_64 (`x86_64-unknown-freebsd`) via VM (`freebsd-vm`)
+* **Codeberg Pipeline (`.woodpecker.yml`)**:
+  * **Woodpecker CI**: Automated testing (`cargo test`) and standalone Linux release packaging (`ampscan-<tag>-x86_64-unknown-linux-gnu.tar.gz`) integrated directly with Codeberg Releases on tag events via `woodpeckerci/plugin-release`.
+
