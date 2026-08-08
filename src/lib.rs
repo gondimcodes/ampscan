@@ -13,4 +13,6 @@ pub mod report;
 pub mod scanner;
 /// System resource limits
 pub mod sys_limits;
+/// Interactive Terminal UI
+pub mod tui;
 

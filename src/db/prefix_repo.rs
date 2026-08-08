@@ -31,22 +31,19 @@ pub fn insert_prefix(conn: &DbConn, prefix: &str, description: &str) -> Result<i
         .with_context(|| format!("Invalid CIDR prefix: '{}'", prefix))?;
     let ip_version: u8 = if net.addr().is_ipv4() { 4 } else { 6 };
 
-    // Safety check for IPv6 prefix size
-    if ip_version == 6 {
-        let prefix_len = net.prefix_len();
-        if prefix_len < 112 {
-            anyhow::bail!(
-                "IPv6 prefix /{} is too large (would scan {} hosts). \
-                 Maximum allowed is /112 (65536 hosts). \
-                 Use a more specific prefix.",
-                prefix_len,
-                if prefix_len < 64 {
-                    "billions of".to_string()
-                } else {
-                    format!("2^{}", 128 - prefix_len)
-                }
-            );
-        }
+    // Safety check for IPv4/IPv6 prefix size
+    let prefix_len = net.prefix_len();
+    if ip_version == 4 && prefix_len < 16 {
+        anyhow::bail!(
+            "IPv4 prefix /{} is too large. Maximum allowed is /16 (65536 hosts).",
+            prefix_len
+        );
+    }
+    if ip_version == 6 && prefix_len < 112 {
+        anyhow::bail!(
+            "IPv6 prefix /{} is too large. Maximum allowed is /112 (65536 hosts).",
+            prefix_len
+        );
     }
 
     let c = lock_db(conn)?;
@@ -118,6 +115,20 @@ pub fn update_prefix(
             .parse()
             .with_context(|| format!("Invalid CIDR prefix: '{}'", prefix))?;
         let ip_version: i64 = if net.addr().is_ipv4() { 4 } else { 6 };
+        let prefix_len = net.prefix_len();
+
+        if ip_version == 4 && prefix_len < 16 {
+            anyhow::bail!(
+                "IPv4 prefix /{} is too large. Maximum allowed is /16 (65536 hosts).",
+                prefix_len
+            );
+        }
+        if ip_version == 6 && prefix_len < 112 {
+            anyhow::bail!(
+                "IPv6 prefix /{} is too large. Maximum allowed is /112 (65536 hosts).",
+                prefix_len
+            );
+        }
 
         let c = lock_db(conn)?;
         c.execute(

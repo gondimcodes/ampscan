@@ -412,7 +412,7 @@ pub fn generate_pdf(
                 let load_res = (|| -> Result<RawImage> {
                     let file = File::open(logo_path)?;
                     let reader = std::io::BufReader::new(file);
-                    let img_reader = ::image::io::Reader::new(reader).with_guessed_format()?;
+                    let img_reader = ::image::ImageReader::new(reader).with_guessed_format()?;
                     let format = img_reader
                         .format()
                         .ok_or_else(|| anyhow::anyhow!("Undetected image format"))?;

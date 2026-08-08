@@ -1,6 +1,6 @@
 # Technology Stack & Architecture — AmpScan
 
-This document provides a comprehensive overview of the technology stack, external crates, system libraries, and architectural decisions powering **ampscan** (v1.3.2).
+This document provides a comprehensive overview of the technology stack, external crates, system libraries, and architectural decisions powering **ampscan** (v1.4.0).
 
 ---
 
@@ -8,68 +8,80 @@ This document provides a comprehensive overview of the technology stack, externa
 
 * **Language**: **Rust (2021 Edition)**
   * **Rationale**: Guarantees memory safety without garbage collection overhead, prevents data races during high-concurrency network scans, ensures predictable resource utilization, and delivers high-performance network I/O.
-* **Async Runtime**: [`tokio 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L13) (`features = ["full"]`)
-  * **Usage**: Non-blocking orchestration of packet transmission/reception (UDP & TCP), fine-grained concurrency control via asynchronous semaphores (`tokio::sync::Semaphore`), and thread yield management (`yield_now`).
+* **Async Runtime**: `tokio 1.x` (`features = ["full"]`)
+  * **Usage**: Non-blocking orchestration of packet transmission/reception (UDP & TCP), fine-grained concurrency control via asynchronous semaphores (`tokio::sync::Semaphore`), and thread yield management.
 
 ---
 
-## 2. Encrypted Database & Data-at-Rest Security
+## 2. Interactive Terminal User Interface (TUI)
 
-* **Storage Engine**: **SQLite3 + SQLCipher** via [`rusqlite 0.32`](file:///home/gondim/projetos/ampscan/Cargo.toml#L58-L64)
+* **TUI Rendering Engine**: `ratatui 0.28`
+  * **Usage**: Rich terminal UI layout orchestration, responsive gauges, tab navigation, styled tables with auto-wrapping, border frames, and real-time finding feeds.
+* **Terminal Control & Input**: `crossterm 0.28`
+  * **Usage**: Raw terminal mode initialization, mouse capture, alternate screen switching, and non-blocking key event processing (`PageUp`, `PageDown`, `Up`, `Down`, `Tab`, digits).
+
+---
+
+## 3. Encrypted Database & Data-at-Rest Security
+
+* **Storage Engine**: **SQLite3 + SQLCipher** via `rusqlite 0.32`
   * **Encryption**: Transparent AES-256-CBC encryption at rest for the entire database (storing users, subnets, ports, and scan report history).
   * **Static & Cross-Platform Builds**:
     * On **Windows** & **Linux ARM64**: Built using `bundled-sqlcipher-vendored-openssl` (compiles SQLCipher and OpenSSL statically from source).
     * On other Unix/Linux/macOS platforms: Built using `bundled-sqlcipher`.
-* **Password Hashing & Authentication**: [`argon2 0.5`](file:///home/gondim/projetos/ampscan/Cargo.toml#L16) (**Argon2id**)
+* **Password Hashing & Authentication**: `argon2 0.5` (**Argon2id**)
   * **Usage**: Secure password hashing and key derivation for local administrator authentication.
-* **Heap Memory Hygiene**: [`zeroize 1.9`](file:///home/gondim/projetos/ampscan/Cargo.toml#L55)
+* **Heap Memory Hygiene**: `zeroize 1.9`
   * **Usage**: Immediate zero-overwriting of raw encryption keys in heap memory (`AMPSCAN_DB_KEY`) right after opening the encrypted database, reducing memory dump exposure windows.
 
 ---
 
-## 3. Command Line Interface (CLI) & User Experience
+## 4. Command Line Interface (CLI) & User Experience
 
-* **Argument Parsing**: [`clap 4.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L10) (`features = ["derive", "env"]`)
-  * **Usage**: Declarative subcommand parsing (`init`, `scan run`, `port list`, etc.), execution flags (`--concurrency`, `--retries`, `--pdf`), and non-interactive automation support via environment variables (`AMPSCAN_PASS`).
-* **Table Formatting**: [`comfy-table 7.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L49)
-  * **Usage**: Rendering clean terminal tables with borders and alignment for port listings, IP subnets, and summary scan results.
-* **Console Styling**: [`colored 2.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L40)
-  * **Usage**: Color-coded output by severity (e.g., bold yellow for `Open/Protected` status, green/yellow/red for latency ranges).
-* **Masked Password Prompt**: [`rpassword 7.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L43)
+* **Argument Parsing**: `clap 4.x` (`features = ["derive", "env"]`)
+  * **Usage**: Declarative subcommand parsing (`init`, `tui`, `scan run`, `port list`, etc.), execution flags (`--concurrency`, `--retries`, `--pdf`, `--db-path`), and non-interactive automation support via environment variables (`AMPSCAN_PASS`, `AMPSCAN_DB_PATH`).
+* **Table Formatting**: `comfy-table 7.x`
+  * **Usage**: Rendering clean terminal tables with borders and alignment for CLI output (port listings, IP subnets, and summary scan results).
+* **Console Styling**: `colored 2.x`
+  * **Usage**: Color-coded CLI output by severity (e.g., bold yellow for `Open/Protected` status, green/yellow/red for latency ranges).
+* **Masked Password Prompt**: `rpassword 7.x`
   * **Usage**: Capturing administrator passwords without echoing characters in the terminal.
 
 ---
 
-## 4. Scanning Engine & Network Protocols
+## 5. Scanning Engine & Network Protocols
 
-* **IP Subnet Management**: [`ipnet 2.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L19)
+* **IP Subnet Management**: `ipnet 2.x`
   * **Usage**: Strict validation and parsing of IPv4 and IPv6 CIDR blocks, supporting full range host expansion.
-* **Amplification Probes**: Internal module [`src/scanner/probes.rs`](file:///home/gondim/projetos/ampscan/src/scanner/probes.rs)
-  * **Usage**: Manual construction and serialization of binary protocol payloads (DNS, NTP, SNMP, Memcached, SSDP, TFTP, LDAP, NetBIOS, SLP, RPC, MikroTik, etc.) dispatched over Tokio UDP/TCP sockets.
+* **Amplification Probes & Strict Packet Validation**: Internal module `src/scanner/probes.rs`
+  * **Source IP Verification**: Strict filtering requiring `src_addr.ip() == target_ip` to reject cross-talk packets.
+  * **DNS (53)**: Random 16-bit Transaction ID (TXID) matching per probe, `QR=1` bit verification, and RCODE/RA status evaluation.
+  * **SNMP (161)**: ASN.1/DER sequence verification (`0x30`) and GetResponse PDU tag matching (`0xA2` / `0xA8`).
+  * **Protocol Payloads**: Tailored parsers for NTP, SSDP, Memcached, RPC Portmapper, CLDAP, NetBIOS, mDNS, TFTP, and generic `udp_payload` signatures with strict length/magic-byte checks to prevent false positives.
 
 ---
 
-## 5. Report Generation & Image Processing
+## 6. Report Generation & Image Processing
 
-* **PDF Engine**: [`printpdf 0.12`](file:///home/gondim/projetos/ampscan/Cargo.toml#L22) (`features = ["png", "jpeg"]`)
+* **PDF Engine**: `printpdf 0.12` (`features = ["png", "jpeg"]`)
   * **Usage**: Low-level 2D vector PDF creation without third-party system dependencies (such as wkhtmltopdf or C graphics libraries).
-* **Image Processing**: [`image 0.24`](file:///home/gondim/projetos/ampscan/Cargo.toml#L23)
+* **Image Processing**: `image 0.24`
   * **Usage**: Decoding, magic byte verification (PNG/JPEG), and rendering of auditor company logos in PDF headers.
 
 ---
 
-## 6. Operating System Integration & System Limits
+## 7. Operating System Integration & System Limits
 
-* **Resource Limit Tuning**: [`libc 0.2`](file:///home/gondim/projetos/ampscan/Cargo.toml#L52)
+* **Resource Limit Tuning**: `libc 0.2`
   * **Usage**: Unix system calls (`rlimit`/`getrlimit`/`setrlimit`) for automatic self-elevation of socket file descriptors (*soft limit* to *hard limit*), preventing file exhaustion errors (`EMFILE`).
-* **Timestamps & Identifiers**: [`chrono 0.4`](file:///home/gondim/projetos/ampscan/Cargo.toml#L34) and [`uuid 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L46)
+* **Timestamps & Identifiers**: `chrono 0.4` and `uuid 1.x`
   * **Usage**: Date formatting in reports and generating UUIDv4 for unique scan session tracking.
-* **Configuration Deserialization**: [`toml 0.8`](file:///home/gondim/projetos/ampscan/Cargo.toml#L28) and [`serde 1.x`](file:///home/gondim/projetos/ampscan/Cargo.toml#L26)
+* **Configuration Deserialization**: `toml 0.8` and `serde 1.x`
   * **Usage**: Parsing and managing local configuration settings (`config.toml`).
 
 ---
 
-## 7. Multi-Platform CI/CD Infrastructure & Code Mirroring
+## 8. Multi-Platform CI/CD Infrastructure & Code Mirroring
 
 * **GitHub Actions Workflows**:
   * **Continuous Integration (`ci.yml`)**: Automated `cargo check` and `cargo test` runs across Linux and macOS runners on pushes and pull requests.

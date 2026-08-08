@@ -19,6 +19,7 @@ use colored::Colorize;
 use ipnet::IpNet;
 use result::{PortStatus, ProbeResult, ScanReport};
 use std::net::IpAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -48,6 +49,15 @@ pub async fn run_scan(
     prefixes: Vec<Prefix>,
     config: &ScanConfig,
 ) -> Result<ScanReport> {
+    run_scan_with_channel(ports, prefixes, config, None).await
+}
+
+pub async fn run_scan_with_channel(
+    ports: Vec<Port>,
+    prefixes: Vec<Prefix>,
+    config: &ScanConfig,
+    tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tui::app::TuiEvent>>,
+) -> Result<ScanReport> {
     // ── 1. Expand prefixes into individual IPs ────────────────────────────
     let prefix_strings: Vec<String> = prefixes.iter().map(|p| p.prefix.clone()).collect();
     let mut all_ips: Vec<IpAddr> = Vec::new();
@@ -58,23 +68,19 @@ pub async fn run_scan(
             .parse()
             .with_context(|| format!("Invalid prefix: {}", prefix.prefix))?;
 
-        // Prevent memory exhaustion on very large prefix ranges
-        let max_hosts: usize = 65_536;
         let hosts: Vec<IpAddr> = match net {
             IpNet::V4(net4) => {
-                let start: u32 = net4.network().into();
-                let end: u32 = net4.broadcast().into();
-                let hosts_count = (end as u64 - start as u64 + 1) as usize;
-                if hosts_count > max_hosts {
+                if net4.prefix_len() < 16 {
                     anyhow::bail!(
-                        "IPv4 prefix {} is too large to scan ({} hosts). \
-                         The maximum allowed is {} hosts per prefix (e.g., /16).",
+                        "IPv4 prefix {} is too large to scan (prefix /{}). \
+                         The maximum allowed is /16 (65536 hosts).",
                         prefix.prefix,
-                        hosts_count,
-                        max_hosts
+                        net4.prefix_len()
                     );
                 }
-                (start..=end)
+                let net_u32 = u32::from(net4.network());
+                let bcast_u32 = u32::from(net4.broadcast());
+                (net_u32..=bcast_u32)
                     .map(|ip_u32| IpAddr::V4(std::net::Ipv4Addr::from(ip_u32)))
                     .collect()
             }
@@ -99,14 +105,9 @@ pub async fn run_scan(
     let total_ips = all_ips.len();
     let total_probes = total_ips * ports.len();
 
-    eprintln!(
-        "{} Scanning {} IPs × {} ports = {} probes (concurrency: {})",
-        "🌐".cyan().bold(),
-        total_ips.to_string().bold(),
-        ports.len().to_string().bold(),
-        total_probes.to_string().bold(),
-        config.concurrency.to_string().bold()
-    );
+    if let Some(ref sender) = tx {
+        let _ = sender.send(crate::tui::app::TuiEvent::ScanStarted(total_probes));
+    }
 
     let mut report = ScanReport::new(Uuid::new_v4().to_string(), prefix_strings);
     report.total_ips = total_ips;
@@ -158,9 +159,12 @@ pub async fn run_scan(
                                 break 'outer;
                             }
                         }
+                        if let Some(ref sender) = tx {
+                            let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(probe_result.clone()));
+                        }
                         report.results.push(probe_result);
                         done += 1;
-                        draw_progress(done, total_probes);
+                        draw_progress(done, total_probes, tx.is_some());
                     }
                     Some(Err(e)) if !e.is_cancelled() => {
                         eprintln!("\nTask error: {}", e);
@@ -201,9 +205,12 @@ pub async fn run_scan(
                         continue;
                     }
                 }
+                if let Some(ref sender) = tx {
+                    let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(probe_result.clone()));
+                }
                 report.results.push(probe_result);
                 done += 1;
-                draw_progress(done, total_probes);
+                draw_progress(done, total_probes, tx.is_some());
             }
             Err(e) if !e.is_cancelled() => {
                 eprintln!("\nTask error: {}", e);
@@ -241,21 +248,26 @@ pub async fn run_scan(
 
     report.finalize();
 
-    // ── 6. Summary ────────────────────────────────────────────────────────
-    let vulnerable = report.vulnerable_results().len();
-    let vuln_ips = report.vulnerable_ips().len();
-    eprintln!(
-        "{} Scan complete: {} vulnerable ports found on {} IPs (out of {} tested)",
-        "✓".green().bold(),
-        vulnerable.to_string().red().bold(),
-        vuln_ips.to_string().red().bold(),
-        report.total_ips.to_string().bold()
-    );
+    let is_tui = tx.is_some();
+    if !is_tui {
+        let vulnerable = report.vulnerable_results().len();
+        let vuln_ips = report.vulnerable_ips().len();
+        eprintln!(
+            "\n{} Scan complete: {} vulnerable ports found on {} IPs (out of {} tested)",
+            "✓".green().bold(),
+            vulnerable.to_string().red().bold(),
+            vuln_ips.to_string().red().bold(),
+            report.total_ips.to_string().bold()
+        );
+    }
 
     Ok(report)
 }
 
-fn draw_progress(done: usize, total: usize) {
+fn draw_progress(done: usize, total: usize, is_tui: bool) {
+    if is_tui {
+        return;
+    }
     use std::io::Write;
     let width = 30;
     let ratio = if total > 0 {
@@ -285,49 +297,77 @@ pub async fn scan_single_ip(
     ports: Vec<Port>,
     config: &ScanConfig,
 ) -> Result<Vec<ProbeResult>> {
-    let total = ports.len();
-    let mut handles = Vec::with_capacity(total);
+    scan_single_ip_with_channel(ip, ports, config, None).await
+}
 
-    // Track progress atomically
-    let completed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+pub async fn scan_single_ip_with_channel(
+    ip: IpAddr,
+    ports: Vec<Port>,
+    config: &ScanConfig,
+    tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tui::app::TuiEvent>>,
+) -> Result<Vec<ProbeResult>> {
+    scan_target_with_channel(&ip.to_string(), ports, config, tx).await
+}
 
-    for port_config in ports {
-        let completed = completed.clone();
-        let timeout = config.timeout;
-        let retries = config.retries;
-
-        let handle = tokio::spawn(async move {
-            let result = probes::execute_probe(ip, &port_config, timeout, retries).await;
-            let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            draw_progress(done, total);
-            result
-        });
-        handles.push(handle);
-    }
-
-    let mut results = Vec::with_capacity(total);
-    for handle in handles {
-        match handle.await {
-            Ok(res) => results.push(res),
-            Err(e) => eprintln!("\nTask error: {}", e),
-        }
-    }
-    eprintln!();
-
-    // Post-process: if any result is Open or OpenProtected, the host is alive.
-    let is_alive = results.iter().any(|r| {
-        r.status == result::PortStatus::Open || r.status == result::PortStatus::OpenProtected
-    });
-
-    if is_alive {
-        for r in &mut results {
-            if r.status == result::PortStatus::Inconclusive {
-                r.status = result::PortStatus::Closed;
+pub async fn scan_target_with_channel(
+    target: &str,
+    ports: Vec<Port>,
+    config: &ScanConfig,
+    tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tui::app::TuiEvent>>,
+) -> Result<Vec<ProbeResult>> {
+    let target = target.trim();
+    let ips: Vec<IpAddr> = if let Ok(ip) = IpAddr::from_str(target) {
+        vec![ip]
+    } else if let Ok(net) = ipnet::IpNet::from_str(target) {
+        match net {
+            ipnet::IpNet::V4(net4) => {
+                if net4.prefix_len() < 16 {
+                    anyhow::bail!(
+                        "IPv4 prefix {} is too large to scan (prefix /{}). The maximum allowed is /16 (65536 hosts).",
+                        target,
+                        net4.prefix_len()
+                    );
+                }
+                net4.hosts().map(IpAddr::V4).collect()
+            }
+            ipnet::IpNet::V6(net6) => {
+                if net6.prefix_len() < 112 {
+                    anyhow::bail!(
+                        "IPv6 prefix {} is too large to scan (prefix /{}). The maximum allowed is /112 (65536 hosts).",
+                        target,
+                        net6.prefix_len()
+                    );
+                }
+                net6.hosts().map(IpAddr::V6).collect()
             }
         }
+    } else {
+        anyhow::bail!("Invalid target IP or CIDR prefix: {}", target);
+    };
+
+    if ips.is_empty() {
+        return Ok(Vec::new());
     }
 
-    Ok(results)
+    let total_probes = ips.len() * ports.len();
+    if let Some(ref sender) = tx {
+        let _ = sender.send(crate::tui::app::TuiEvent::ScanStarted(total_probes));
+    }
+
+    let ip_ver = if ips.first().map(|ip| ip.is_ipv6()).unwrap_or(false) { 6 } else { 4 };
+
+    let dummy_prefix = Prefix {
+        id: 0,
+        prefix: target.to_string(),
+        description: "Target Scan".to_string(),
+        ip_version: ip_ver,
+        enabled: true,
+        created_at: String::new(),
+        updated_at: String::new(),
+    };
+
+    let report = run_scan_with_channel(ports, vec![dummy_prefix], config, tx).await?;
+    Ok(report.results)
 }
 
 #[cfg(test)]

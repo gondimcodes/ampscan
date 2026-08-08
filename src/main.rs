@@ -29,9 +29,9 @@ use std::time::Duration;
     version
 )]
 struct Cli {
-    /// Database file path
-    #[arg(long, default_value = "ampscan.db", global = true)]
-    db_path: String,
+    /// Database file path (obrigatorio)
+    #[arg(long, global = true, env = "AMPSCAN_DB_PATH")]
+    db_path: Option<String>,
 
     /// Admin user (or set AMPSCAN_USER environment variable)
     #[arg(short, long, global = true, env = "AMPSCAN_USER")]
@@ -61,6 +61,31 @@ enum Commands {
     /// Execute amplification scan
     #[command(subcommand)]
     Scan(ScanCommands),
+
+    /// Launch interactive Terminal User Interface (TUI)
+    Tui {
+        /// Maximum number of simultaneous probes
+        #[arg(short, long, default_value = "256")]
+        concurrency: usize,
+        /// Timeout per probe in seconds
+        #[arg(short, long, default_value = "3")]
+        timeout: u64,
+        /// Number of retries for UDP probes (default is 2)
+        #[arg(short, long, default_value = "2")]
+        retries: usize,
+        /// Request PDF report generation when scan finishes
+        #[arg(long)]
+        pdf: bool,
+        /// Output PDF report file path
+        #[arg(short, long, default_value = "ampscan_report.pdf")]
+        output: String,
+        /// Company/client name for the report
+        #[arg(long)]
+        client_name: Option<String>,
+        /// PDF report recipient (e.g., manager or department name)
+        #[arg(long)]
+        recipient: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -250,6 +275,31 @@ async fn main() -> Result<()> {
             let db = open_and_auth(&cli)?;
             cmd_scan(&db, cmd).await
         }
+        Commands::Tui {
+            concurrency,
+            timeout,
+            retries,
+            pdf,
+            output,
+            client_name,
+            recipient,
+        } => {
+            let db_p = cli.db_path.as_deref().unwrap_or("");
+            if db_p.is_empty() {
+                anyhow::bail!("O caminho do banco de dados (--db-path) é obrigatório para carregar a TUI com os alvos.");
+            }
+            ampscan::tui::run_tui(
+                db_p.to_string(),
+                *concurrency,
+                *timeout,
+                *retries,
+                *pdf,
+                output.clone(),
+                client_name.clone(),
+                recipient.clone(),
+            )
+            .await
+        }
     }
 }
 
@@ -259,13 +309,18 @@ async fn main() -> Result<()> {
 
 /// Open the database and authenticate the user.
 fn open_and_auth(cli: &Cli) -> Result<DbConn> {
+    let db_path = match &cli.db_path {
+        Some(p) => p.as_str(),
+        None => anyhow::bail!("O parâmetro --db-path é obrigatório."),
+    };
+
     // Ensure database file exists before trying to open it
-    if !std::path::Path::new(&cli.db_path).exists() {
-        anyhow::bail!("Database not initialized. Run 'ampscan init' first.");
+    if !std::path::Path::new(db_path).exists() {
+        anyhow::bail!("Database file '{}' not found. Run 'ampscan init' first.", db_path);
     }
 
     let mut key = db::get_db_key()?;
-    let db = db::open_database(&cli.db_path, &key)?;
+    let db = db::open_database(db_path, &key)?;
     // Zeroize our copy of the key from the heap immediately after the connection is open.
     // SQLCipher has already copied it into its internal cipher state.
     db::zeroize_key(&mut key);
@@ -311,18 +366,19 @@ fn prompt_username() -> Result<String> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async fn cmd_init(cli: &Cli) -> Result<()> {
+    let db_path = cli.db_path.as_deref().unwrap_or("ampscan.db");
     let mut key = db::get_db_key()?;
 
     println!("{}", "Initializing database...".cyan());
 
     // If database files already exist, remove them to allow fresh initialization
-    if std::path::Path::new(&cli.db_path).exists() {
-        let _ = std::fs::remove_file(&cli.db_path);
-        let _ = std::fs::remove_file(format!("{}-wal", cli.db_path));
-        let _ = std::fs::remove_file(format!("{}-shm", cli.db_path));
+    if std::path::Path::new(db_path).exists() {
+        let _ = std::fs::remove_file(db_path);
+        let _ = std::fs::remove_file(format!("{}-wal", db_path));
+        let _ = std::fs::remove_file(format!("{}-shm", db_path));
     }
 
-    let db = db::open_database(&cli.db_path, &key)?;
+    let db = db::open_database(db_path, &key)?;
     db::zeroize_key(&mut key);
 
     // Seed default ports
@@ -353,7 +409,7 @@ async fn cmd_init(cli: &Cli) -> Result<()> {
     println!(
         "\n{} Database initialized at: {}",
         "✓".green().bold(),
-        cli.db_path
+        db_path
     );
     println!(
         "  The database is encrypted with AES-256 (SQLCipher).\n  \

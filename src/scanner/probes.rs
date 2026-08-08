@@ -18,22 +18,29 @@ pub async fn execute_probe(
     timeout: Duration,
     retries: usize,
 ) -> ProbeResult {
-    let start = Instant::now();
-
-    let status = match port_config.protocol.as_str() {
-        "tcp" => execute_tcp_probe(ip, port_config.port, timeout).await,
+    let (status, latency_ms) = match port_config.protocol.as_str() {
+        "tcp" => {
+            let start = Instant::now();
+            let st = execute_tcp_probe(ip, port_config.port, timeout).await;
+            let lat = if matches!(st, PortStatus::Open | PortStatus::OpenProtected) {
+                Some(start.elapsed().as_millis() as u64)
+            } else {
+                None
+            };
+            (st, lat)
+        }
         "udp" => {
             if port_config.probe_type == "dns" {
                 execute_dns_probe(ip, port_config.port, timeout, retries).await
+            } else if port_config.probe_type == "snmp" {
+                execute_snmp_probe(ip, port_config.port, timeout, retries).await
             } else {
                 let payload = build_payload(&port_config.probe_type, port_config.probe_payload.as_deref());
-                execute_udp_probe(ip, port_config.port, &payload, timeout, retries).await
+                execute_udp_probe(ip, port_config.port, &port_config.probe_type, &payload, timeout, retries).await
             }
         }
-        other => PortStatus::Error(format!("Unknown protocol: {}", other)),
+        other => (PortStatus::Error(format!("Unknown protocol: {}", other)), None),
     };
-
-    let elapsed = start.elapsed();
 
     ProbeResult {
         ip,
@@ -42,7 +49,7 @@ pub async fn execute_probe(
         service_name: port_config.name.clone(),
         description: port_config.description.clone(),
         status,
-        response_time_ms: Some(elapsed.as_millis() as u64),
+        response_time_ms: latency_ms,
         timestamp: Utc::now(),
     }
 }
@@ -56,30 +63,50 @@ async fn execute_dns_probe(
     port: u16,
     timeout: Duration,
     retries: usize,
-) -> PortStatus {
-    let payload = build_dns_payload();
+) -> (PortStatus, Option<u64>) {
+    let (payload, txid) = build_dns_payload_with_txid();
     match send_udp_probe(ip, port, &payload, timeout, retries).await {
-        Ok(Some(response)) => {
-            // Check if it's a DNS response and has RCODE = 5 (REFUSED) or RA = 0 (Recursion Available flag not set)
-            if response.len() >= 4 {
+        Ok(Some((response, elapsed))) => {
+            let lat_millis = elapsed.as_millis() as u64;
+
+            // Strict latency rule: if response time >= 1000ms, assume no valid real-time response (timeout/stale)
+            if lat_millis >= 1000 {
+                return (PortStatus::Inconclusive, None);
+            }
+
+            // DNS Header MUST be at least 12 bytes
+            if response.len() >= 12 {
+                let resp_txid = u16::from_be_bytes([response[0], response[1]]);
+                if resp_txid != txid {
+                    // Mismatched transaction ID - stale packet or unrelated response
+                    return (PortStatus::Inconclusive, None);
+                }
+
+                let qr = (response[2] & 0x80) != 0; // QR bit: 1 = Response
+                if !qr {
+                    return (PortStatus::Inconclusive, None);
+                }
+
                 let rcode = response[3] & 0x0F;
-                let ra = (response[3] & 0x80) != 0;
-                if rcode == 5 || !ra {
-                    PortStatus::OpenProtected
+                let ra = (response[3] & 0x80) != 0; // Recursion Available
+
+                // RCODE 0 = NoError (with RA=1 -> Open)
+                if rcode == 0 && ra {
+                    (PortStatus::Open, Some(lat_millis))
                 } else {
-                    PortStatus::Open
+                    (PortStatus::OpenProtected, Some(lat_millis))
                 }
             } else {
-                PortStatus::Open
+                (PortStatus::Inconclusive, None)
             }
         }
-        Ok(None) => PortStatus::Inconclusive,
+        Ok(None) => (PortStatus::Inconclusive, None),
         Err(e) => {
             let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
             if is_fd_exhaustion {
-                PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e))
+                (PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)), None)
             } else {
-                PortStatus::Error(e.to_string())
+                (PortStatus::Error(e.to_string()), None)
             }
         }
     }
@@ -88,19 +115,148 @@ async fn execute_dns_probe(
 async fn execute_udp_probe(
     ip: IpAddr,
     port: u16,
+    probe_type: &str,
     payload: &[u8],
     timeout: Duration,
     retries: usize,
-) -> PortStatus {
+) -> (PortStatus, Option<u64>) {
     match send_udp_probe(ip, port, payload, timeout, retries).await {
-        Ok(Some(_)) => PortStatus::Open,
-        Ok(None) => PortStatus::Inconclusive,
+        Ok(Some((response, elapsed))) => {
+            let lat_ms = elapsed.as_millis() as u64;
+            if lat_ms >= 1000 {
+                return (PortStatus::Inconclusive, None);
+            }
+
+            let is_valid = validate_udp_response(probe_type, &response);
+            if is_valid {
+                (PortStatus::Open, Some(lat_ms))
+            } else {
+                (PortStatus::Inconclusive, None)
+            }
+        }
+        Ok(None) => (PortStatus::Inconclusive, None),
         Err(e) => {
             let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
             if is_fd_exhaustion {
-                PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e))
+                (PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)), None)
             } else {
-                PortStatus::Error(e.to_string())
+                (PortStatus::Error(e.to_string()), None)
+            }
+        }
+    }
+}
+
+/// Validate protocol-specific response payload structure
+fn validate_udp_response(probe_type: &str, resp: &[u8]) -> bool {
+    if resp.is_empty() {
+        return false;
+    }
+
+    match probe_type {
+        "ntp" => {
+            // NTP Control Message Response: length >= 12, VN is 2..4, Mode is 6 (0x16 or 0x1A or 0x06 in low bits)
+            // or standard NTP response (Mode 4)
+            if resp.len() >= 12 {
+                let mode = resp[0] & 0x07;
+                mode == 6 || mode == 4 || (resp[0] & 0x38) != 0
+            } else {
+                false
+            }
+        }
+        "ssdp" => {
+            // SSDP Response MUST contain HTTP header indicator "HTTP/1.1" or "ST:" or "LOCATION:"
+            let resp_str = String::from_utf8_lossy(resp);
+            resp_str.contains("HTTP/1.1") || resp_str.contains("ST:") || resp_str.contains("LOCATION:")
+        }
+        "memcached" => {
+            // Memcached stats response contains "STAT " or "END" or binary protocol magic 0x81
+            let resp_str = String::from_utf8_lossy(resp);
+            resp_str.contains("STAT ") || resp_str.contains("END") || (resp.len() >= 4 && resp[0] == 0x81)
+        }
+        "rpc" => {
+            // RPC reply message MUST be at least 16 bytes, XID matching and MsgType = 1 (Reply)
+            if resp.len() >= 16 {
+                let msg_type = u32::from_be_bytes([resp[4], resp[5], resp[6], resp[7]]);
+                msg_type == 1 // 1 = Reply
+            } else {
+                false
+            }
+        }
+        "ldap" => {
+            // CLDAP response starts with 0x30 (SEQUENCE) and contains LDAP response tag 0x64 (searchEntry) or 0x65
+            resp.len() >= 10 && resp[0] == 0x30 && resp.iter().any(|&b| b == 0x64 || b == 0x65)
+        }
+        "netbios" => {
+            // NetBIOS NBSTAT response: length >= 50, flags bit 15 = 1 (Response)
+            if resp.len() >= 50 {
+                let flags = u16::from_be_bytes([resp[2], resp[3]]);
+                (flags & 0x8000) != 0 // QR bit: 1 = Response
+            } else {
+                false
+            }
+        }
+        "mdns" => {
+            // mDNS response: length >= 12, QR bit = 1 (Response)
+            if resp.len() >= 12 {
+                let flags = u16::from_be_bytes([resp[2], resp[3]]);
+                (flags & 0x8000) != 0
+            } else {
+                false
+            }
+        }
+        "tftp" => {
+            // TFTP response opcode: 0x0003 (DATA) or 0x0005 (ERROR)
+            if resp.len() >= 4 {
+                let opcode = u16::from_be_bytes([resp[0], resp[1]]);
+                opcode == 3 || opcode == 5
+            } else {
+                false
+            }
+        }
+        "udp_payload" => {
+            // Generic UDP payload response must be at least 12 bytes and contain non-zero data
+            if resp.len() >= 12 {
+                resp.iter().any(|&b| b != 0)
+            } else {
+                false
+            }
+        }
+        _ => {
+            // Fallback for custom probes: require at least 8 non-zero bytes
+            resp.len() >= 8 && resp.iter().any(|&b| b != 0)
+        }
+    }
+}
+
+async fn execute_snmp_probe(
+    ip: IpAddr,
+    port: u16,
+    timeout: Duration,
+    retries: usize,
+) -> (PortStatus, Option<u64>) {
+    let payload = build_snmp_payload();
+    match send_udp_probe(ip, port, &payload, timeout, retries).await {
+        Ok(Some((response, elapsed))) => {
+            let lat_ms = elapsed.as_millis() as u64;
+            if lat_ms >= 1000 {
+                return (PortStatus::Inconclusive, None);
+            }
+
+            // Valid SNMP response starts with 0x30 (SEQUENCE) and is at least 15 bytes long
+            // Must contain 0xA2 (GetResponse-PDU) tag or 0xA8 (Report/Inform PDU)
+            if response.len() >= 15 && response[0] == 0x30 && response.iter().any(|&b| b == 0xA2 || b == 0xA8) {
+                (PortStatus::Open, Some(lat_ms))
+            } else {
+                (PortStatus::Inconclusive, None)
+            }
+        }
+        Ok(None) => (PortStatus::Inconclusive, None),
+        Err(e) => {
+            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            if is_fd_exhaustion {
+                (PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)), None)
+            } else {
+                (PortStatus::Error(e.to_string()), None)
             }
         }
     }
@@ -112,15 +268,13 @@ async fn send_udp_probe(
     payload: &[u8],
     timeout: Duration,
     retries: usize,
-) -> io::Result<Option<Vec<u8>>> {
+) -> io::Result<Option<(Vec<u8>, Duration)>> {
     let bind_addr: SocketAddr = match ip {
         IpAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
         IpAddr::V6(_) => "[::]:0".parse().unwrap(),
     };
 
     let max_attempts = retries + 1;
-    // Each attempt gets the full declared timeout. The --timeout flag means
-    // "wait this long per attempt", not "split this across retries".
     let attempt_timeout = timeout;
     let mut last_err = None;
 
@@ -129,11 +283,12 @@ async fn send_udp_probe(
             Ok(s) => s,
             Err(e) => {
                 last_err = Some(e);
-                break; // Stop retries if we can't even bind the local socket (typically EMFILE/ENFILE)
+                break;
             }
         };
         let dest = SocketAddr::new(ip, port);
 
+        let attempt_start = Instant::now();
         if let Err(e) = socket.send_to(payload, dest).await {
             last_err = Some(e);
             if attempt < max_attempts {
@@ -144,9 +299,13 @@ async fn send_udp_probe(
 
         let mut buf = vec![0u8; 4096];
         match tokio::time::timeout(attempt_timeout, socket.recv_from(&mut buf)).await {
-            Ok(Ok((n, _))) if n > 0 => {
-                buf.truncate(n);
-                return Ok(Some(buf));
+            Ok(Ok((n, src_addr))) if n > 0 => {
+                // Strict source IP check: discard packets that did NOT originate from the target IP
+                if src_addr.ip() == ip {
+                    let elapsed = attempt_start.elapsed();
+                    buf.truncate(n);
+                    return Ok(Some((buf, elapsed)));
+                }
             }
             Ok(Ok(_)) => {}
             Ok(Err(e)) => {
@@ -223,7 +382,7 @@ fn build_payload(probe_type: &str, db_payload: Option<&[u8]>) -> Vec<u8> {
 // ── DNS (53/udp) ────────────────────────────────────────────────────────
 // Standard DNS A query for google.com with recursion desired.
 // Replicates: host -W 5 google.com $IP
-fn build_dns_payload() -> Vec<u8> {
+fn build_dns_payload_with_txid() -> (Vec<u8>, u16) {
     let mut rng = rand::thread_rng();
     let txid: u16 = rng.gen();
 
@@ -243,7 +402,11 @@ fn build_dns_payload() -> Vec<u8> {
     pkt.push(0); // root label
     pkt.extend_from_slice(&[0x00, 0x01]); // QTYPE: A
     pkt.extend_from_slice(&[0x00, 0x01]); // QCLASS: IN
-    pkt
+    (pkt, txid)
+}
+
+fn build_dns_payload() -> Vec<u8> {
+    build_dns_payload_with_txid().0
 }
 
 // ── mDNS (5353/udp) ─────────────────────────────────────────────────────
