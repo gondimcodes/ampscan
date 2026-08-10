@@ -45,7 +45,7 @@ The compiled binary will be located at `target/release/ampscan`.
 ## 🧭 Quick Start Workflow
 
 ### 1. Initialize the Database
-On the first run, initialize the database to create the encrypted schema, register the 20 default ports, and configure the initial administrator user password:
+On the first run, initialize the database to create the encrypted schema, register the 21 default ports, and configure the initial administrator user password:
 
 ```bash
 ./target/release/ampscan init
@@ -142,7 +142,7 @@ Allows real-time tweaking of scanner runtime parameters: **Max Concurrency** (up
 ## 📖 CLI Command Reference
 
 ### `ampscan init`
-Initializes the encrypted database structure, populates it with the 20 default amplification ports, and creates the system's master user.
+Initializes the encrypted database structure, populates it with the 21 default amplification ports, and creates the system's master user.
 
 ### Port Management (`port`)
 Allows you to manage which ports and payloads will be tested during the scan:
