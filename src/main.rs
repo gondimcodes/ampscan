@@ -384,7 +384,7 @@ async fn cmd_init(cli: &Cli) -> Result<()> {
     // Seed default ports
     port_repo::seed_default_ports(&db)?;
     println!(
-        "  {} 20 default amplification ports registered",
+        "  {} Default amplification ports registered / synchronized",
         "✓".green()
     );
 

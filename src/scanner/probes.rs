@@ -213,6 +213,10 @@ fn validate_udp_response(probe_type: &str, resp: &[u8]) -> bool {
                 false
             }
         }
+        "ripv1" => {
+            // RIP response: length >= 24, Command == 2 (Response), Version == 1 or 2
+            resp.len() >= 24 && resp[0] == 0x02 && (resp[1] == 0x01 || resp[1] == 0x02)
+        }
         "udp_payload" => {
             // Generic UDP payload response must be at least 12 bytes and contain non-zero data
             if resp.len() >= 12 {
@@ -374,9 +378,24 @@ fn build_payload(probe_type: &str, db_payload: Option<&[u8]>) -> Vec<u8> {
         "rpc" => build_rpc_payload(),
         "ldap" => build_ldap_payload(),
         "memcached" => build_memcached_payload(),
+        "ripv1" => build_ripv1_payload(),
         "udp_payload" => db_payload.unwrap_or(&[]).to_vec(),
         _ => db_payload.unwrap_or(&[]).to_vec(),
     }
+}
+
+// ── RIPv1 (520/udp) ─────────────────────────────────────────────────────
+// RIPv1 Request for Full Routing Table (Command=1, Version=1, Metric=16)
+fn build_ripv1_payload() -> Vec<u8> {
+    vec![
+        0x01, 0x01, 0x00, 0x00, // Command: Request (1), Version: RIPv1 (1), Must Be Zero (0)
+        0x00, 0x00,             // Address Family Identifier: Unspecified (0)
+        0x00, 0x00,             // Route Tag / Must Be Zero
+        0x00, 0x00, 0x00, 0x00, // IP Address: 0.0.0.0
+        0x00, 0x00, 0x00, 0x00, // Subnet Mask: 0.0.0.0
+        0x00, 0x00, 0x00, 0x00, // Next Hop: 0.0.0.0
+        0x00, 0x00, 0x00, 0x10, // Metric: 16 (Infinity - Request Full Table)
+    ]
 }
 
 // ── DNS (53/udp) ────────────────────────────────────────────────────────
@@ -712,9 +731,20 @@ mod tests {
     }
 
     #[test]
+    fn test_ripv1_payload_structure() {
+        let pkt = build_ripv1_payload();
+        assert_eq!(pkt.len(), 24);
+        // Command: 1 (Request), Version: 1 (RIPv1)
+        assert_eq!(pkt[0], 0x01);
+        assert_eq!(pkt[1], 0x01);
+        // Metric: 16 (Infinity)
+        assert_eq!(&pkt[20..24], &[0x00, 0x00, 0x00, 0x10]);
+    }
+
+    #[test]
     fn test_build_payload_dispatch() {
         // Known probe types should build non-empty payloads
-        for pt in &["dns", "mdns", "snmp", "ntp", "ssdp", "tftp", "netbios", "rpc", "ldap", "memcached"] {
+        for pt in &["dns", "mdns", "snmp", "ntp", "ssdp", "tftp", "netbios", "rpc", "ldap", "memcached", "ripv1"] {
             let payload = build_payload(pt, None);
             assert!(!payload.is_empty(), "Probe '{}' should produce non-empty payload", pt);
         }

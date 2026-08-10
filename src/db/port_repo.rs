@@ -36,11 +36,11 @@ pub fn insert_port(
 ) -> Result<i64> {
     let c = lock_db(conn)?;
     c.execute(
-        "INSERT INTO ports (port, protocol, name, description, probe_type, probe_payload)
+        "INSERT OR IGNORE INTO ports (port, protocol, name, description, probe_type, probe_payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         rusqlite::params![port as i64, protocol, name, description, probe_type, probe_payload],
     )
-    .context("Failed to insert port (may already exist with same port/protocol)")?;
+    .context("Failed to insert port")?;
     Ok(c.last_insert_rowid())
 }
 
@@ -123,14 +123,6 @@ pub fn delete_port(conn: &DbConn, id: i64) -> Result<()> {
 /// Seed the database with the 20 default amplification ports from the original script.
 /// Only inserts if the ports table is empty.
 pub fn seed_default_ports(conn: &DbConn) -> Result<()> {
-    // Check if already seeded
-    {
-        let c = lock_db(conn)?;
-        let count: i64 = c.query_row("SELECT COUNT(*) FROM ports", [], |row| row.get(0))?;
-        if count > 0 {
-            return Ok(());
-        }
-    }
 
     // (port, protocol, name, description, probe_type, probe_payload)
     let defaults: Vec<(u16, &str, &str, &str, &str, Vec<u8>)> = vec![
@@ -169,6 +161,11 @@ pub fn seed_default_ports(conn: &DbConn) -> Result<()> {
             137, "udp", "NETBIOS",
             "NetBIOS Name Service - exposure reveals network information and allows amplification",
             "netbios", vec![],
+        ),
+        (
+            520, "udp", "RIPv1",
+            "Routing Information Protocol v1 - legacy routing daemon that amplifies traffic up to 30x",
+            "ripv1", vec![],
         ),
         (
             161, "udp", "SNMP",

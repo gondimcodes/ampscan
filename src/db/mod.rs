@@ -44,6 +44,7 @@ pub fn open_database(path: &str, key: &str) -> Result<DbConn> {
 
     let conn = Arc::new(Mutex::new(conn));
     run_migrations(&conn)?;
+    port_repo::seed_default_ports(&conn)?;
     Ok(conn)
 }
 
