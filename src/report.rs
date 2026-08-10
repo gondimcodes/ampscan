@@ -795,19 +795,19 @@ pub fn generate_pdf(
                 "SLP" => "printf '\\x02\\x01\\x00\\x00\\x36\\x20\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x02\\x65\\x6e\\x00\\x00\\x00\\x15\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x3a\\x73\\x65\\x72\\x76\\x69\\x63\\x65\\x2d\\x61\\x67\\x65\\x6e\\x74\\x00\\x07\\x64\\x65\\x66\\x61\\x75\\x6c\\x74\\x00\\x00\\x00\\x00' | nc -u -w 3 <IP> 427".to_string(),
                 "SSDP" => "printf 'M-SEARCH * HTTP/1.1\\r\\nHost:239.255.255.250:1900\\r\\nST:upnp:rootdevice\\r\\nMan:\"ssdp:discover\"\\r\\nMX:3\\r\\n\\r\\n' | nc -u -w 3 <IP> 1900".to_string(),
                 "ARMS" => "printf '\\x00\\x14\\x00\\x01\\x03' | nc -u -w 3 <IP> 3283 | xxd".to_string(),
-                "WS-DISCOVERY" | "WSDISCOVERY" | "WS-DISCOVER" => "nmap -sU -p3702 --script ws-discovery-enumerate <IP>".to_string(),
+                "WS-DISCOVERY" | "WSDISCOVERY" | "WS-DISCOVER" => "printf '\\x3c\\xaa\\x3e\\x0a' | nc -u -w 3 <IP> 3702 | xxd".to_string(),
                 "MDNS" => "dig +short -p 5353 @<IP> -t PTR _services._dns-sd._udp.local".to_string(),
                 "COAP" => "printf '\\x40\\x01\\x7d\\x70\\xbb\\x2e\\x77\\x65\\x6c\\x6c\\x2d\\x6b\\x6e\\x6f\\x77\\x6e\\x04\\x63\\x6f\\x72\\x65' | nc -u -w 3 <IP> 5683 | xxd".to_string(),
                 "UBNT" => "printf '\\x01\\x00\\x00\\x00' | nc -u -w 3 <IP> 10001 | xxd".to_string(),
                 "MEMCACHED" => "printf '\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x00stats\\n' | nc -u -w 3 <IP> 11211".to_string(),
                 "DVR-DHCPDISCOVER" | "DVR-DHCP" | "DVR" => format!("echo -ne '\\xff' | nc -u -w 2 <IP> {} | xxd", port),
-                "MT4145" => format!("nmap -sT -pT:{} -Pn -n <IP>", port),
-                "MT5678" => format!("nmap -sT -pT:{} -Pn -n <IP>", port),
+                "MT4145" => "nc -z -v -w 3 <IP> 4145".to_string(),
+                "MT5678" => "nc -z -v -w 3 <IP> 5678".to_string(),
                 _ => {
                     if protocol.to_lowercase() == "tcp" {
-                        format!("nmap -sT -pT:{} -Pn -n <IP>", port)
+                        format!("nc -z -v -w 3 <IP> {}", port)
                     } else {
-                        format!("nmap -sU -pU:{} -Pn -n <IP>", port)
+                        format!("echo 'test' | nc -u -w 3 <IP> {} | xxd", port)
                     }
                 }
             };

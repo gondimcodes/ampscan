@@ -231,10 +231,40 @@ During each port scan, the status can be classified as:
 
 ---
 
+## 🧪 Manual Verification Commands (All 21 Amplification Ports)
+
+Below is the complete list of standard command-line instructions to manually and independently verify any finding identified by AmpScan. Replace `<IP>` with the target host address:
+
+| Service | Port / Proto | Amplification Factor | Manual Verification Command |
+|---|---|---|---|
+| **QOTD** | 17 / UDP | ~140x | `echo 'test' \| nc -u -w 3 <IP> 17 \| xxd` |
+| **CHARGEN** | 19 / UDP | ~358x | `echo 'test' \| nc -u -w 3 <IP> 19 \| xxd` |
+| **DNS** | 53 / UDP | ~54x | `dig +short -t ANY google.com @<IP>` |
+| **TFTP** | 69 / UDP | ~60x | `tftp <IP> -c get a.pdf` |
+| **RPC (Portmapper)** | 111 / UDP | ~28x | `rpcinfo -T udp -p <IP>` |
+| **NTP** | 123 / UDP | ~556x | `ntpq -c rv <IP>` |
+| **NetBIOS** | 137 / UDP | ~4x | `nmblookup -A <IP>` |
+| **CLDAP** | 389 / UDP | ~70x | `ldapsearch -x -h <IP> -s base` |
+| **SLP** | 427 / UDP | ~2200x | `printf '\x02\x01\x00\x00\x36\x20\x00\x00\x00\x00\x00\x01\x00\x02\x65\x6e\x00\x00\x00\x15\x73\x65\x72\x76\x69\x63\x65\x3a\x73\x65\x72\x76\x69\x63\x65\x2d\x61\x67\x65\x6e\x74\x00\x07\x64\x65\x66\x61\x75\x6c\x74\x00\x00\x00\x00' \| nc -u -w 3 <IP> 427` |
+| **RIPv1** | 520 / UDP | ~30x | `printf '\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10' \| nc -u -w 3 <IP> 520 \| xxd` |
+| **SNMP** | 161 / UDP | ~6.3x | `snmpget -v 2c -c public <IP> iso.3.6.1.2.1.1.1.0` |
+| **SSDP** | 1900 / UDP | ~30x | `printf 'M-SEARCH * HTTP/1.1\r\nHost:239.255.255.250:1900\r\nST:upnp:rootdevice\r\nMan:"ssdp:discover"\r\nMX:3\r\n\r\n' \| nc -u -w 3 <IP> 1900` |
+| **ARMS** | 3283 / UDP | ~35.5x | `printf '\x00\x14\x00\x01\x03' \| nc -u -w 3 <IP> 3283 \| xxd` |
+| **WS-DISCOVERY** | 3702 / UDP | ~153x | `printf '\x3c\xaa\x3e\x0a' \| nc -u -w 3 <IP> 3702 \| xxd` |
+| **mDNS** | 5353 / UDP | ~4.7x | `dig +short -p 5353 @<IP> -t PTR _services._dns-sd._udp.local` |
+| **CoAP** | 5683 / UDP | ~34x | `printf '\x40\x01\x7d\x70\xbb\x2e\x77\x65\x6c\x6c\x2d\x6b\x6e\x6f\x77\x6e\x04\x63\x6f\x72\x65' \| nc -u -w 3 <IP> 5683 \| xxd` |
+| **UBNT** | 10001 / UDP | ~30x | `printf '\x01\x00\x00\x00' \| nc -u -w 3 <IP> 10001 \| xxd` |
+| **Memcached** | 11211 / UDP | ~51000x | `printf '\x00\x00\x00\x00\x00\x01\x00\x00stats\n' \| nc -u -w 3 <IP> 11211` |
+| **DVR-DHCPDiscover** | 37810 / UDP | ~25x | `echo -ne '\xff' \| nc -u -w 2 <IP> 37810 \| xxd` |
+| **MT4145** | 4145 / TCP | Proxy / Compromised | `nc -z -v -w 3 <IP> 4145` |
+| **MT5678** | 5678 / TCP | Meris Botnet | `nc -z -v -w 3 <IP> 5678` |
+
+---
+
 ## 🚀 CI/CD & Release Automation (Codeberg)
 
 This repository supports build and test automation via **Woodpecker CI** hosted on Codeberg:
 
 * **Continuous Integration (CI):** On every `push` or `pull_request` sent to the `main` branch, the complete unit and integration test suite is executed automatically (with parallelism limited to `-j 1` to respect Codeberg's shared resource guidelines).
-* **Continuous Delivery (CD):** When creating and pushing a version tag (e.g., `v1.4.3`), the pipeline compiles the binary (`ampscan`) in production mode (Release) for Linux x86_64, compresses it into a `.tar.gz` file, and attaches the final file directly to the Releases page on Codeberg.
+* **Continuous Delivery (CD):** When creating and pushing a version tag (e.g., `v1.4.4`), the pipeline compiles the binary (`ampscan`) in production mode (Release) for Linux x86_64, compresses it into a `.tar.gz` file, and attaches the final file directly to the Releases page on Codeberg.
 

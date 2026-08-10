@@ -1,6 +1,6 @@
 # Technology Stack & Architecture — AmpScan
 
-This document provides a comprehensive overview of the technology stack, external crates, system libraries, and architectural decisions powering **ampscan** (v1.4.3).
+This document provides a comprehensive overview of the technology stack, external crates, system libraries, and architectural decisions powering **ampscan** (v1.4.4).
 
 ---
 
