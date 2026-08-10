@@ -210,16 +210,21 @@ fn validate_udp_response(probe_type: &str, resp: &[u8]) -> bool {
             resp.len() >= 24 && resp[0] == 0x02 && (resp[1] == 0x01 || resp[1] == 0x02)
         }
         "udp_payload" => {
-            // Generic UDP payload response must be at least 12 bytes and contain non-zero data
-            if resp.len() >= 12 {
+            // Generic UDP payload response must be at least 12 bytes, contain non-zero data,
+            // and MUST NOT start with IPv4 (0x4x) or IPv6 (0x6x) headers from ICMP reflection
+            let version_nibble = resp[0] & 0xF0;
+            let is_ip_header = version_nibble == 0x40 || version_nibble == 0x60;
+            if resp.len() >= 12 && !is_ip_header {
                 resp.iter().any(|&b| b != 0)
             } else {
                 false
             }
         }
         _ => {
-            // Fallback for custom probes: require at least 8 non-zero bytes
-            resp.len() >= 8 && resp.iter().any(|&b| b != 0)
+            // Fallback for custom probes: require at least 8 non-zero bytes and not IP error header
+            let version_nibble = resp[0] & 0xF0;
+            let is_ip_header = version_nibble == 0x40 || version_nibble == 0x60;
+            resp.len() >= 8 && !is_ip_header && resp.iter().any(|&b| b != 0)
         }
     }
 }
@@ -275,14 +280,34 @@ async fn send_udp_probe(
         let socket = match UdpSocket::bind(bind_addr).await {
             Ok(s) => s,
             Err(e) => {
+                let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+                if is_fd_exhaustion {
+                    return Err(e);
+                }
                 last_err = Some(e);
                 break;
             }
         };
         let dest = SocketAddr::new(ip, port);
 
+        // Connect socket to target (ip, port).
+        // On Linux/Unix, a connected UDP socket:
+        // 1. Filters out all incoming datagrams not from (ip, port) at kernel level.
+        // 2. Delivers ICMP Port Unreachable / Refused errors as Err(ConnectionRefused) instead of raw packet data.
+        if let Err(e) = socket.connect(dest).await {
+            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            if is_fd_exhaustion {
+                return Err(e);
+            }
+            last_err = Some(e);
+            if attempt < max_attempts {
+                tokio::time::sleep(Duration::from_millis(300)).await;
+            }
+            continue;
+        }
+
         let attempt_start = Instant::now();
-        if let Err(e) = socket.send_to(payload, dest).await {
+        if let Err(e) = socket.send(payload).await {
             let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
             if is_fd_exhaustion {
                 return Err(e);
@@ -295,14 +320,11 @@ async fn send_udp_probe(
         }
 
         let mut buf = vec![0u8; 4096];
-        match tokio::time::timeout(attempt_timeout, socket.recv_from(&mut buf)).await {
-            Ok(Ok((n, src_addr))) if n > 0 => {
-                // Strict source IP AND source PORT check: discard packets not originating from the queried port
-                if src_addr.ip() == ip && src_addr.port() == port {
-                    let elapsed = attempt_start.elapsed();
-                    buf.truncate(n);
-                    return Ok(Some((buf, elapsed)));
-                }
+        match tokio::time::timeout(attempt_timeout, socket.recv(&mut buf)).await {
+            Ok(Ok(n)) if n > 0 => {
+                let elapsed = attempt_start.elapsed();
+                buf.truncate(n);
+                return Ok(Some((buf, elapsed)));
             }
             Ok(Ok(_)) => {}
             Ok(Err(e)) => {
