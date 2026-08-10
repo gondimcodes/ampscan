@@ -1,6 +1,6 @@
 # Technology Stack & Architecture — AmpScan
 
-This document provides a comprehensive overview of the technology stack, external crates, system libraries, and architectural decisions powering **ampscan** (v1.4.0).
+This document provides a comprehensive overview of the technology stack, external crates, system libraries, and architectural decisions powering **ampscan** (v1.4.1).
 
 ---
 
@@ -15,7 +15,7 @@ This document provides a comprehensive overview of the technology stack, externa
 
 ## 2. Interactive Terminal User Interface (TUI)
 
-* **TUI Rendering Engine**: `ratatui 0.28`
+* **TUI Rendering Engine**: `ratatui 0.30`
   * **Usage**: Rich terminal UI layout orchestration, responsive gauges, tab navigation, styled tables with auto-wrapping, border frames, and real-time finding feeds.
 * **Terminal Control & Input**: `crossterm 0.28`
   * **Usage**: Raw terminal mode initialization, mouse capture, alternate screen switching, and non-blocking key event processing (`PageUp`, `PageDown`, `Up`, `Down`, `Tab`, digits).
@@ -57,7 +57,7 @@ This document provides a comprehensive overview of the technology stack, externa
   * **Source IP Verification**: Strict filtering requiring `src_addr.ip() == target_ip` to reject cross-talk packets.
   * **DNS (53)**: Random 16-bit Transaction ID (TXID) matching per probe, `QR=1` bit verification, and RCODE/RA status evaluation.
   * **SNMP (161)**: ASN.1/DER sequence verification (`0x30`) and GetResponse PDU tag matching (`0xA2` / `0xA8`).
-  * **Protocol Payloads**: Tailored parsers for NTP, SSDP, Memcached, RPC Portmapper, CLDAP, NetBIOS, mDNS, TFTP, and generic `udp_payload` signatures with strict length/magic-byte checks to prevent false positives.
+  * **Protocol Payloads**: Tailored parsers for NTP, SSDP, Memcached, RPC Portmapper, CLDAP, NetBIOS, mDNS, TFTP, RIPv1 (520/udp), and generic `udp_payload` signatures with strict length/magic-byte checks to prevent false positives.
 
 ---
 
