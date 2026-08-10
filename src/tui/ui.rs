@@ -50,7 +50,7 @@ fn render_tabs(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" ampscan v1.4.1 ")
+                .title(concat!(" ampscan v", env!("CARGO_PKG_VERSION"), " "))
                 .style(Style::default().fg(Color::DarkGray)),
         )
         .select(selected_index)

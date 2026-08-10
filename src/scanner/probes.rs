@@ -69,11 +69,6 @@ async fn execute_dns_probe(
         Ok(Some((response, elapsed))) => {
             let lat_millis = elapsed.as_millis() as u64;
 
-            // Strict latency rule: if response time >= 1000ms, assume no valid real-time response (timeout/stale)
-            if lat_millis >= 1000 {
-                return (PortStatus::Inconclusive, None);
-            }
-
             // DNS Header MUST be at least 12 bytes
             if response.len() >= 12 {
                 let resp_txid = u16::from_be_bytes([response[0], response[1]]);
@@ -123,9 +118,6 @@ async fn execute_udp_probe(
     match send_udp_probe(ip, port, payload, timeout, retries).await {
         Ok(Some((response, elapsed))) => {
             let lat_ms = elapsed.as_millis() as u64;
-            if lat_ms >= 1000 {
-                return (PortStatus::Inconclusive, None);
-            }
 
             let is_valid = validate_udp_response(probe_type, &response);
             if is_valid {
@@ -242,9 +234,6 @@ async fn execute_snmp_probe(
     match send_udp_probe(ip, port, &payload, timeout, retries).await {
         Ok(Some((response, elapsed))) => {
             let lat_ms = elapsed.as_millis() as u64;
-            if lat_ms >= 1000 {
-                return (PortStatus::Inconclusive, None);
-            }
 
             // Valid SNMP response starts with 0x30 (SEQUENCE) and is at least 15 bytes long
             // Must contain 0xA2 (GetResponse-PDU) tag or 0xA8 (Report/Inform PDU)
@@ -294,6 +283,10 @@ async fn send_udp_probe(
 
         let attempt_start = Instant::now();
         if let Err(e) = socket.send_to(payload, dest).await {
+            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            if is_fd_exhaustion {
+                return Err(e);
+            }
             last_err = Some(e);
             if attempt < max_attempts {
                 tokio::time::sleep(Duration::from_millis(300)).await;
@@ -304,8 +297,8 @@ async fn send_udp_probe(
         let mut buf = vec![0u8; 4096];
         match tokio::time::timeout(attempt_timeout, socket.recv_from(&mut buf)).await {
             Ok(Ok((n, src_addr))) if n > 0 => {
-                // Strict source IP check: discard packets that did NOT originate from the target IP
-                if src_addr.ip() == ip {
+                // Strict source IP AND source PORT check: discard packets not originating from the queried port
+                if src_addr.ip() == ip && src_addr.port() == port {
                     let elapsed = attempt_start.elapsed();
                     buf.truncate(n);
                     return Ok(Some((buf, elapsed)));
@@ -313,6 +306,10 @@ async fn send_udp_probe(
             }
             Ok(Ok(_)) => {}
             Ok(Err(e)) => {
+                let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+                if is_fd_exhaustion {
+                    return Err(e);
+                }
                 last_err = Some(e);
             }
             Err(_) => {
@@ -325,8 +322,15 @@ async fn send_udp_probe(
         }
     }
 
+    // ICMP Port Unreachable / Refused / Timeout on UDP indicate closed/filtered port (not scanner failure).
+    // Only return Err for critical OS errors (e.g. FD exhaustion).
     if let Some(e) = last_err {
-        Err(e)
+        let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+        if is_fd_exhaustion {
+            Err(e)
+        } else {
+            Ok(None)
+        }
     } else {
         Ok(None)
     }
