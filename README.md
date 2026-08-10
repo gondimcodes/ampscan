@@ -242,9 +242,9 @@ Below is the complete list of standard command-line instructions to manually and
 | **DNS** | 53 / UDP | ~54x | `dig +short -t ANY google.com @<IP>` |
 | **TFTP** | 69 / UDP | ~60x | `tftp <IP> -c get a.pdf` |
 | **RPC (Portmapper)** | 111 / UDP | ~28x | `rpcinfo -T udp -p <IP>` |
-| **NTP** | 123 / UDP | ~556x | `ntpq -c rv <IP>` |
-| **NetBIOS** | 137 / UDP | ~4x | `nmblookup -A <IP>` |
-| **CLDAP** | 389 / UDP | ~70x | `ldapsearch -x -h <IP> -s base` |
+| **NTP** | 123 / UDP | ~556x | `printf '\x16\x02\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00' \| nc -u -w 3 <IP> 123 \| xxd` |
+| **NetBIOS** | 137 / UDP | ~4x | `printf '\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x20CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\x00\x00\x21\x00\x01' \| nc -u -w 3 <IP> 137 \| xxd` |
+| **CLDAP** | 389 / UDP | ~70x | `printf '\x30\x25\x02\x01\x01\x63\x20\x04\x00\x0a\x01\x00\x0a\x01\x00\x02\x01\x00\x02\x01\x00\x01\x01\x00\x87\x0bobjectClass\x30\x00' \| nc -u -w 3 <IP> 389 \| xxd` |
 | **SLP** | 427 / UDP | ~2200x | `printf '\x02\x01\x00\x00\x36\x20\x00\x00\x00\x00\x00\x01\x00\x02\x65\x6e\x00\x00\x00\x15\x73\x65\x72\x76\x69\x63\x65\x3a\x73\x65\x72\x76\x69\x63\x65\x2d\x61\x67\x65\x6e\x74\x00\x07\x64\x65\x66\x61\x75\x6c\x74\x00\x00\x00\x00' \| nc -u -w 3 <IP> 427` |
 | **RIPv1** | 520 / UDP | ~30x | `printf '\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10' \| nc -u -w 3 <IP> 520 \| xxd` |
 | **SNMP** | 161 / UDP | ~6.3x | `snmpget -v 2c -c public <IP> iso.3.6.1.2.1.1.1.0` |
