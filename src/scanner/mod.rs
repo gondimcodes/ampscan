@@ -14,7 +14,7 @@ pub mod probes;
 pub mod result;
 
 use crate::db::models::{Port, Prefix};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use colored::Colorize;
 use ipnet::IpNet;
 use result::{PortStatus, ProbeResult, ScanReport};
@@ -63,10 +63,16 @@ pub async fn run_scan_with_channel(
     let mut all_ips: Vec<IpAddr> = Vec::new();
 
     for prefix in &prefixes {
-        let net: IpNet = prefix
-            .prefix
-            .parse()
-            .with_context(|| format!("Invalid prefix: {}", prefix.prefix))?;
+        let net: IpNet = if let Ok(n) = prefix.prefix.parse::<IpNet>() {
+            n
+        } else if let Ok(ip) = prefix.prefix.parse::<IpAddr>() {
+            match ip {
+                IpAddr::V4(ip4) => IpNet::V4(ipnet::Ipv4Net::new(ip4, 32).unwrap()),
+                IpAddr::V6(ip6) => IpNet::V6(ipnet::Ipv6Net::new(ip6, 128).unwrap()),
+            }
+        } else {
+            anyhow::bail!("Invalid prefix: {}", prefix.prefix);
+        };
 
         let hosts: Vec<IpAddr> = match net {
             IpNet::V4(net4) => {
@@ -93,7 +99,11 @@ pub async fn run_scan_with_channel(
                         net6.prefix_len()
                     );
                 }
-                net6.hosts().map(IpAddr::V6).collect()
+                if net6.prefix_len() == 128 {
+                    vec![IpAddr::V6(net6.addr())]
+                } else {
+                    net6.hosts().map(IpAddr::V6).collect()
+                }
             }
         };
         all_ips.extend(hosts);
@@ -328,7 +338,11 @@ pub async fn scan_target_with_channel(
                         net4.prefix_len()
                     );
                 }
-                net4.hosts().map(IpAddr::V4).collect()
+                let net_u32 = u32::from(net4.network());
+                let bcast_u32 = u32::from(net4.broadcast());
+                (net_u32..=bcast_u32)
+                    .map(|ip_u32| IpAddr::V4(std::net::Ipv4Addr::from(ip_u32)))
+                    .collect()
             }
             ipnet::IpNet::V6(net6) => {
                 if net6.prefix_len() < 112 {
@@ -338,7 +352,11 @@ pub async fn scan_target_with_channel(
                         net6.prefix_len()
                     );
                 }
-                net6.hosts().map(IpAddr::V6).collect()
+                if net6.prefix_len() == 128 {
+                    vec![IpAddr::V6(net6.addr())]
+                } else {
+                    net6.hosts().map(IpAddr::V6).collect()
+                }
             }
         }
     } else {
@@ -393,6 +411,28 @@ mod tests {
         assert_eq!(hosts.len(), 256);
         assert_eq!(hosts[0], "192.168.1.0".parse::<IpAddr>().unwrap());
         assert_eq!(hosts[255], "192.168.1.255".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn test_single_ip_and_slash_32_expansion() {
+        let ip_plain = "192.168.1.1";
+        let ip_parsed: IpAddr = ip_plain.parse().unwrap();
+        assert_eq!(ip_parsed, IpAddr::V4("192.168.1.1".parse().unwrap()));
+
+        let cidr_32 = "192.168.1.1/32";
+        let net: IpNet = cidr_32.parse().unwrap();
+        let hosts: Vec<IpAddr> = match net {
+            IpNet::V4(net4) => {
+                let start: u32 = net4.network().into();
+                let end: u32 = net4.broadcast().into();
+                (start..=end)
+                    .map(|ip_u32| IpAddr::V4(std::net::Ipv4Addr::from(ip_u32)))
+                    .collect()
+            }
+            IpNet::V6(_) => vec![],
+        };
+        assert_eq!(hosts.len(), 1);
+        assert_eq!(hosts[0], "192.168.1.1".parse::<IpAddr>().unwrap());
     }
 
     #[test]

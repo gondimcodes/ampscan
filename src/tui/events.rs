@@ -16,7 +16,14 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                 // Handle text input on SingleTarget and Settings tabs
                 if app.active_tab == Tab::SingleTarget {
                     match key.code {
-                        KeyCode::Char(c) => {
+                        KeyCode::Char('s') | KeyCode::Char('S') => {
+                            return Ok(UserAction::StartSingleScan);
+                        }
+                        KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => {
+                            app.should_quit = true;
+                            return Ok(UserAction::None);
+                        }
+                        KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == ':' || c == '/' || c.is_ascii_hexdigit() => {
                             app.single_ip_input.push(c);
                             return Ok(UserAction::None);
                         }
