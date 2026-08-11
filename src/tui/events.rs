@@ -10,7 +10,7 @@ pub enum UserAction {
 }
 
 pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
-    if event::poll(Duration::from_millis(50))? {
+    if event::poll(Duration::from_millis(16))? {
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 // Handle text input on SingleTarget and Settings tabs

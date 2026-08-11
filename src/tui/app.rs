@@ -71,6 +71,8 @@ pub struct App {
     // Scan Data & Logs
     pub stats: ScanStats,
     pub logs: Vec<ProbeResult>,
+    pub filtered_log_indices: Vec<usize>,
+    pub port_stats: std::collections::HashMap<u16, (usize, usize)>,
     pub selected_log_index: usize,
     
     // DB Data Cache for TUI
@@ -116,6 +118,8 @@ impl App {
             is_scanning: false,
             stats: ScanStats::default(),
             logs: Vec::new(),
+            filtered_log_indices: Vec::new(),
+            port_stats: std::collections::HashMap::new(),
             selected_log_index: 0,
             prefixes: Vec::new(),
             ports: Vec::new(),
@@ -133,7 +137,7 @@ impl App {
             pdf_output,
             pdf_client_name,
             pdf_recipient,
-            status_message: Some("Ready - Press [S] to start scanning target".to_string()),
+            status_message: None,
         }
     }
 
@@ -153,23 +157,45 @@ impl App {
         self.active_tab = Tab::ALL[prev_idx];
     }
 
+    pub fn clear_scan_data(&mut self) {
+        self.logs.clear();
+        self.filtered_log_indices.clear();
+        self.port_stats.clear();
+        self.selected_log_index = 0;
+        self.stats = ScanStats::default();
+        self.stats.start_time = Some(std::time::Instant::now());
+    }
+
     pub fn get_filtered_findings_count(&self) -> usize {
-        self.logs
-            .iter()
-            .filter(|log| {
-                log.status == crate::scanner::result::PortStatus::Open
-                    || log.status == crate::scanner::result::PortStatus::OpenProtected
-            })
-            .count()
+        self.filtered_log_indices.len()
     }
 
     pub fn add_probe_result(&mut self, result: ProbeResult) {
+        let is_finding = matches!(
+            result.status,
+            crate::scanner::result::PortStatus::Open | crate::scanner::result::PortStatus::OpenProtected
+        );
+
         match &result.status {
-            crate::scanner::result::PortStatus::Open => self.stats.vulnerable_count += 1,
-            crate::scanner::result::PortStatus::OpenProtected => self.stats.protected_count += 1,
+            crate::scanner::result::PortStatus::Open => {
+                self.stats.vulnerable_count += 1;
+                let entry = self.port_stats.entry(result.port).or_default();
+                entry.0 += 1;
+            }
+            crate::scanner::result::PortStatus::OpenProtected => {
+                self.stats.protected_count += 1;
+                let entry = self.port_stats.entry(result.port).or_default();
+                entry.1 += 1;
+            }
             _ => self.stats.closed_count += 1,
         }
         self.stats.completed_probes += 1;
+        
+        let new_idx = self.logs.len();
         self.logs.push(result);
+
+        if is_finding {
+            self.filtered_log_indices.push(new_idx);
+        }
     }
 }

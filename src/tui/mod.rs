@@ -63,70 +63,77 @@ pub async fn run_tui(
 
     // Main TUI Event Loop
     loop {
-        // Drain any incoming scan events from background task
-        while let Ok(tui_event) = rx.try_recv() {
-            match tui_event {
-                TuiEvent::ScanStarted(total) => {
-                    app.stats.total_probes = total;
-                }
-                TuiEvent::ProbeCompleted(res) => {
-                    app.add_probe_result(res);
-                }
-                TuiEvent::ScanFinished => {
-                    app.is_scanning = false;
-
-                    // If --pdf flag was supplied via CLI, generate PDF report automatically
-                    if app.pdf_export {
-                        let scan_id = uuid::Uuid::new_v4().to_string();
-                        let prefixes: Vec<String> = app.prefixes.iter().map(|p| p.prefix.clone()).collect();
-                        let mut report = crate::scanner::result::ScanReport::new(scan_id, prefixes);
-                        
-                        // Calculate total unique IPs tested from logs
-                        let mut unique_ips: Vec<_> = app.logs.iter().map(|l| l.ip).collect();
-                        unique_ips.sort();
-                        unique_ips.dedup();
-                        
-                        report.total_ips = unique_ips.len();
-                        report.total_probes = app.stats.total_probes.max(app.logs.len());
-                        report.results = app.logs.clone();
-                        
-                        // Preserve start time if available
-                        if let Some(start_inst) = app.stats.start_time {
-                            let elapsed = start_inst.elapsed();
-                            report.started_at = chrono::Utc::now() - chrono::Duration::from_std(elapsed).unwrap_or_default();
+        // Drain incoming scan events from background task in batches to ensure smooth 60 FPS rendering
+        let mut processed = 0;
+        while processed < 2000 {
+            match rx.try_recv() {
+                Ok(tui_event) => {
+                    processed += 1;
+                    match tui_event {
+                        TuiEvent::ScanStarted(total) => {
+                            app.stats.total_probes = total;
                         }
-                        
-                        report.finalize();
+                        TuiEvent::ProbeCompleted(res) => {
+                            app.add_probe_result(res);
+                        }
+                        TuiEvent::ScanFinished => {
+                            app.is_scanning = false;
 
-                        let app_config = crate::report::AppConfig::load();
-                        match crate::report::generate_pdf(
-                            &report,
-                            &app.pdf_output,
-                            app.pdf_client_name.as_deref(),
-                            app.pdf_recipient.as_deref(),
-                            &app_config,
-                        ) {
-                            Ok(_) => {
-                                app.status_message = Some(format!(
-                                    "Scan completed! PDF report generated: {}",
-                                    app.pdf_output
-                                ));
-                            }
-                            Err(e) => {
-                                app.status_message = Some(format!(
-                                    "Scan completed! PDF report error: {}",
-                                    e
-                                ));
+                            // If --pdf flag was supplied via CLI, generate PDF report automatically
+                            if app.pdf_export {
+                                let scan_id = uuid::Uuid::new_v4().to_string();
+                                let prefixes: Vec<String> = app.prefixes.iter().map(|p| p.prefix.clone()).collect();
+                                let mut report = crate::scanner::result::ScanReport::new(scan_id, prefixes);
+                                
+                                // Calculate total unique IPs tested from logs
+                                let mut unique_ips: Vec<_> = app.logs.iter().map(|l| l.ip).collect();
+                                unique_ips.sort();
+                                unique_ips.dedup();
+                                
+                                report.total_ips = unique_ips.len();
+                                report.total_probes = app.stats.total_probes.max(app.logs.len());
+                                report.results = app.logs.clone();
+                                
+                                // Preserve start time if available
+                                if let Some(start_inst) = app.stats.start_time {
+                                    let elapsed = start_inst.elapsed();
+                                    report.started_at = chrono::Utc::now() - chrono::Duration::from_std(elapsed).unwrap_or_default();
+                                }
+                                
+                                report.finalize();
+
+                                let app_config = crate::report::AppConfig::load();
+                                match crate::report::generate_pdf(
+                                    &report,
+                                    &app.pdf_output,
+                                    app.pdf_client_name.as_deref(),
+                                    app.pdf_recipient.as_deref(),
+                                    &app_config,
+                                ) {
+                                    Ok(_) => {
+                                        app.status_message = Some(format!(
+                                            "Scan completed! PDF report generated: {}",
+                                            app.pdf_output
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        app.status_message = Some(format!(
+                                            "Scan completed! PDF report error: {}",
+                                            e
+                                        ));
+                                    }
+                                }
+                            } else {
+                                app.status_message = Some("Scan completed!".to_string());
                             }
                         }
-                    } else {
-                        app.status_message = Some("Scan completed!".to_string());
+                        TuiEvent::ScanError(msg) => {
+                            app.is_scanning = false;
+                            app.status_message = Some(format!("Scan error: {}", msg));
+                        }
                     }
                 }
-                TuiEvent::ScanError(msg) => {
-                    app.is_scanning = false;
-                    app.status_message = Some(format!("Scan error: {}", msg));
-                }
+                Err(_) => break,
             }
         }
 
@@ -146,9 +153,7 @@ pub async fn run_tui(
                             app.status_message = Some(format!("Invalid IP or CIDR Prefix: '{}'", target_str));
                         } else {
                             app.is_scanning = true;
-                            app.logs.clear();
-                            app.stats = app::ScanStats::default();
-                            app.stats.start_time = Some(std::time::Instant::now());
+                            app.clear_scan_data();
 
                             let db_path = app.db_path.clone();
                             let db_key = app.db_key.clone();
@@ -195,9 +200,7 @@ pub async fn run_tui(
                 events::UserAction::StartFullScan => {
                     if !app.is_scanning {
                         app.is_scanning = true;
-                        app.logs.clear();
-                        app.stats = app::ScanStats::default();
-                        app.stats.start_time = Some(std::time::Instant::now());
+                        app.clear_scan_data();
 
                         let db_path = app.db_path.clone();
                         let db_key = app.db_key.clone();

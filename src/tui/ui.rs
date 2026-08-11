@@ -210,14 +210,7 @@ fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
         .map(|h| Span::styled(*h, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
     let header = Row::new(header_cells).height(1).bottom_margin(1);
 
-    // Filter logs to ONLY show Vulnerable (Open) and Open/Protected findings
-    let filtered_logs: Vec<_> = app
-        .logs
-        .iter()
-        .filter(|log| log.status == PortStatus::Open || log.status == PortStatus::OpenProtected)
-        .collect();
-
-    let total_findings = filtered_logs.len();
+    let total_findings = app.filtered_log_indices.len();
 
     // Dynamically calculate visible rows based on left component height
     let visible_height = (left_area.height as usize).saturating_sub(4);
@@ -237,31 +230,39 @@ fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
         ideal_start.min(max_start)
     };
 
-    let rows = filtered_logs.iter().enumerate().skip(start_idx).take(visible_height).map(|(idx, log)| {
-        let is_selected = idx == selected_idx;
-        let (status_str, status_style) = match &log.status {
-            PortStatus::Open => ("VULNERABLE", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            PortStatus::OpenProtected => ("Open/Protected", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            _ => ("Other", Style::default().fg(Color::DarkGray)),
-        };
+    let rows = app
+        .filtered_log_indices
+        .iter()
+        .skip(start_idx)
+        .take(visible_height)
+        .enumerate()
+        .map(|(rel_idx, &log_idx)| {
+            let abs_idx = start_idx + rel_idx;
+            let is_selected = abs_idx == selected_idx;
+            let log = &app.logs[log_idx];
+            let (status_str, status_style) = match &log.status {
+                PortStatus::Open => ("VULNERABLE", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+                PortStatus::OpenProtected => ("Open/Protected", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                _ => ("Other", Style::default().fg(Color::DarkGray)),
+            };
 
-        let latency_str = log.response_time_ms.map(|ms| format!("{} ms", ms)).unwrap_or_else(|| "-".to_string());
+            let latency_str = log.response_time_ms.map(|ms| format!("{} ms", ms)).unwrap_or_else(|| "-".to_string());
 
-        let row_style = if is_selected {
-            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default()
-        };
+            let row_style = if is_selected {
+                Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
 
-        Row::new(vec![
-            Span::raw((idx + 1).to_string()),
-            Span::raw(log.ip.to_string()),
-            Span::raw(log.port.to_string()),
-            Span::raw(log.service_name.clone()),
-            Span::styled(status_str, status_style),
-            Span::raw(latency_str),
-        ]).style(row_style)
-    });
+            Row::new(vec![
+                Span::raw((abs_idx + 1).to_string()),
+                Span::raw(log.ip.to_string()),
+                Span::raw(log.port.to_string()),
+                Span::raw(log.service_name.clone()),
+                Span::styled(status_str, status_style),
+                Span::raw(latency_str),
+            ]).style(row_style)
+        });
 
     let display_counter = if total_findings == 0 { 0 } else { selected_idx + 1 };
     let title_text = if total_findings == 0 {
@@ -302,8 +303,7 @@ fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
 
     if !app.ports.is_empty() {
         for port in &app.ports {
-            let vuln = app.logs.iter().filter(|l| l.port == port.port && l.status == PortStatus::Open).count();
-            let prot = app.logs.iter().filter(|l| l.port == port.port && l.status == PortStatus::OpenProtected).count();
+            let (vuln, prot) = app.port_stats.get(&port.port).copied().unwrap_or((0, 0));
             stats_list.push(PortStat {
                 display_name: format!("{} ({}/{})", port.name, port.port, port.protocol),
                 vulnerable: vuln,
