@@ -48,7 +48,7 @@ The compiled binary will be located at `target/release/ampscan`.
 On the first run, initialize the database to create the encrypted schema, register the 21 default ports, and configure the initial administrator user password:
 
 ```bash
-./target/release/ampscan init
+ampscan init
 ```
 *Enter the desired username and set a strong password when prompted interactively.*
 
@@ -56,14 +56,14 @@ On the first run, initialize the database to create the encrypted schema, regist
 For full scanning to work, you need to register which network prefixes you own/manage to be tested:
 
 ```bash
-./target/release/ampscan prefix add --prefix "192.168.1.0/24" --description "Corporate Office Network"
+ampscan prefix add --prefix "192.168.1.0/24" --description "Corporate Office Network"
 ```
 
 ### 3. List Registered Ports
 Check the amplification ports registered in the system:
 
 ```bash
-./target/release/ampscan port list
+ampscan port list
 ```
 
 ### 4. Launch the Interactive TUI
@@ -71,7 +71,7 @@ Launch the Terminal User Interface to monitor scans, inspect results, or run tar
 
 ```bash
 # Mandatory: --db-path must be specified to load prefixes and ports
-./target/release/ampscan tui --db-path /opt/ampscan/ampscan.db -c 512 -t 2
+ampscan tui --db-path /opt/ampscan/ampscan.db -c 512 -t 2
 ```
 
 ---
@@ -86,13 +86,13 @@ AmpScan includes a rich **Terminal User Interface (TUI)** built with `ratatui` a
 
 ```bash
 # 1. Standard TUI launch with database
-./target/release/ampscan tui --db-path /path/to/ampscan.db
+ampscan tui --db-path /path/to/ampscan.db
 
 # 2. Custom concurrency (1024 threads) and probe timeout (2s)
-./target/release/ampscan tui --db-path /path/to/ampscan.db -c 1024 -t 2
+ampscan tui --db-path /path/to/ampscan.db -c 1024 -t 2
 
 # 3. TUI launch with automatic PDF report generation upon scan completion
-./target/release/ampscan tui --db-path /path/to/ampscan.db -c 512 -t 2 --pdf --recipient "SOC Team" -o /var/reports/audit.pdf
+ampscan tui --db-path /path/to/ampscan.db -c 512 -t 2 --pdf --recipient "SOC Team" -o /var/reports/audit.pdf
 ```
 
 ---
@@ -149,13 +149,13 @@ Allows you to manage which ports and payloads will be tested during the scan:
 
 *   **List:**
     ```bash
-    ./target/release/ampscan --db-path ampscan.db port list
+    ampscan --db-path ampscan.db port list
     ```
     ![Port List Output](ampscan_port_list.png)
 *   **Disable / Enable a specific port:**
     ```bash
-    ./target/release/ampscan --db-path ampscan.db port disable <ID>
-    ./target/release/ampscan --db-path ampscan.db port enable <ID>
+    ampscan --db-path ampscan.db port disable <ID>
+    ampscan --db-path ampscan.db port enable <ID>
     ```
 
 ### Prefix Management (`prefix`)
@@ -163,27 +163,27 @@ Defines the targets for batch scanning (accepts IPv4 and IPv6 ranges):
 
 *   **List:**
     ```bash
-    ./target/release/ampscan --db-path ampscan.db prefix list
+    ampscan --db-path ampscan.db prefix list
     ```
     ![Prefix List Output](ampscan_prefix_list.png)
 *   **Add:**
     ```bash
-    ./target/release/ampscan --db-path ampscan.db prefix add --prefix "2001:db8::/120" --description "IPv6 Staging Hosts"
+    ampscan --db-path ampscan.db prefix add --prefix "2001:db8::/120" --description "IPv6 Staging Hosts"
     ```
 *   **Disable / Enable:**
     ```bash
-    ./target/release/ampscan --db-path ampscan.db prefix disable <ID>
-    ./target/release/ampscan --db-path ampscan.db prefix enable <ID>
+    ampscan --db-path ampscan.db prefix disable <ID>
+    ampscan --db-path ampscan.db prefix enable <ID>
     ```
 
 ### User Management (`user`)
 *   **Add new administrator:**
     ```bash
-    ./target/release/ampscan --db-path ampscan.db user add --username new_admin
+    ampscan --db-path ampscan.db user add --username new_admin
     ```
 *   **Change password:**
     ```bash
-    ./target/release/ampscan --db-path ampscan.db user change-password --username admin
+    ampscan --db-path ampscan.db user change-password --username admin
     ```
 
 ### Running Scans (`scan`)
@@ -202,20 +202,20 @@ Fetches all prefixes and ports marked as active (`enabled`) in the database and 
 
 Robust execution example:
 ```bash
-./target/release/ampscan --db-path ampscan.db scan run --concurrency 500 --timeout 2 --pdf --output scan_june.pdf
+ampscan --db-path ampscan.db scan run --concurrency 500 --timeout 2 --pdf --output scan_june.pdf
 ```
 ![Scan Run CLI Output](ampscan_report_cli.png)
 
 Example with manual prefix:
 ```bash
-./target/release/ampscan --db-path ampscan.db scan run --prefix "10.0.0.0/29"
+ampscan --db-path ampscan.db scan run --prefix "10.0.0.0/29"
 ```
 
 #### 2. Single IP Mode (`scan single`)
 Tests all active ports against a single destination IP, printing real-time responses and timings to the console:
 
 ```bash
-./target/release/ampscan --db-path ampscan.db scan single 1.1.1.1 --timeout 2
+ampscan --db-path ampscan.db scan single 1.1.1.1 --timeout 2
 ```
 
 ---
