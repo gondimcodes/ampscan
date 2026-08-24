@@ -45,7 +45,7 @@ The compiled binary will be located at `target/release/ampscan`.
 ## 🧭 Quick Start Workflow
 
 ### 1. Initialize the Database
-On the first run, initialize the database to create the encrypted schema, register the 21 default ports, and configure the initial administrator user password:
+On the first run, initialize the database to create the encrypted schema, register the 23 default ports, and configure the initial administrator user password:
 
 ```bash
 ampscan init
@@ -142,7 +142,7 @@ Allows real-time tweaking of scanner runtime parameters: **Max Concurrency** (up
 ## 📖 CLI Command Reference
 
 ### `ampscan init`
-Initializes the encrypted database structure, populates it with the 21 default amplification ports, and creates the system's master user.
+Initializes the encrypted database structure, populates it with the 23 default amplification ports, and creates the system's master user.
 
 ### Port Management (`port`)
 Allows you to manage which ports and payloads will be tested during the scan:
@@ -231,7 +231,7 @@ During each port scan, the status can be classified as:
 
 ---
 
-## 🧪 Manual Verification Commands (All 21 Amplification Ports)
+## 🧪 Manual Verification Commands (All 23 Amplification Ports)
 
 Below is the complete list of standard command-line instructions to manually and independently verify any finding identified by AmpScan. Replace `<IP>` with the target host address:
 
@@ -250,7 +250,9 @@ Below is the complete list of standard command-line instructions to manually and
 | **SNMP** | 161 / UDP | ~6.3x | `snmpget -v 2c -c public <IP> iso.3.6.1.2.1.1.1.0` |
 | **SSDP** | 1900 / UDP | ~30x | `printf 'M-SEARCH * HTTP/1.1\r\nHost:239.255.255.250:1900\r\nST:upnp:rootdevice\r\nMan:"ssdp:discover"\r\nMX:3\r\n\r\n' \| nc -u -w 3 <IP> 1900` |
 | **ARMS** | 3283 / UDP | ~35.5x | `printf '\x00\x14\x00\x01\x03' \| nc -u -w 3 <IP> 3283 \| xxd` |
+| **MS-RDPEUDP** | 3389 / UDP | ~85.9x | `printf '\x00\x00\x00\x00\x01\x00\x01\x00\x12\x34\x56\x78\xb0\x04\xb0\x04' \| nc -u -w 3 <IP> 3389 \| xxd` |
 | **WS-DISCOVERY** | 3702 / UDP | ~153x | `printf '\x3c\xaa\x3e\x0a' \| nc -u -w 3 <IP> 3702 \| xxd` |
+| **SIP** | 5060 / UDP | ~15x - 30x | `printf 'OPTIONS sip:ping@<IP> SIP/2.0\r\nVia: SIP/2.0/UDP <IP>:5060;branch=z9hG4bK-1\r\nMax-Forwards: 70\r\nFrom: <sip:ping@<IP>>;tag=1\r\nTo: <sip:ping@<IP>>\r\nCall-ID: 1@<IP>\r\nCSeq: 1 OPTIONS\r\nContent-Length: 0\r\n\r\n' \| nc -u -w 3 <IP> 5060` |
 | **mDNS** | 5353 / UDP | ~4.7x | `dig +short -p 5353 @<IP> -t PTR _services._dns-sd._udp.local` |
 | **CoAP** | 5683 / UDP | ~34x | `printf '\x40\x01\x7d\x70\xbb\x2e\x77\x65\x6c\x6c\x2d\x6b\x6e\x6f\x77\x6e\x04\x63\x6f\x72\x65' \| nc -u -w 3 <IP> 5683 \| xxd` |
 | **UBNT** | 10001 / UDP | ~30x | `printf '\x01\x00\x00\x00' \| nc -u -w 3 <IP> 10001 \| xxd` |
@@ -266,5 +268,5 @@ Below is the complete list of standard command-line instructions to manually and
 This repository supports build and test automation via **Woodpecker CI** hosted on Codeberg:
 
 * **Continuous Integration (CI):** On every `push` or `pull_request` sent to the `main` branch, the complete unit and integration test suite is executed automatically (with parallelism limited to `-j 1` to respect Codeberg's shared resource guidelines).
-* **Continuous Delivery (CD):** When creating and pushing a version tag (e.g., `v1.4.6`), the pipeline compiles the binary (`ampscan`) in production mode (Release) for Linux x86_64, compresses it into a `.tar.gz` file, and attaches the final file directly to the Releases page on Codeberg.
+* **Continuous Delivery (CD):** When creating and pushing a version tag (e.g., `v1.4.7`), the pipeline compiles the binary (`ampscan`) in production mode (Release) for Linux x86_64, compresses it into a `.tar.gz` file, and attaches the final file directly to the Releases page on Codeberg.
 
