@@ -201,10 +201,20 @@ pub fn seed_default_ports(conn: &DbConn) -> Result<()> {
             vec![0x00, 0x14, 0x00, 0x01, 0x03],
         ),
         (
+            3389, "udp", "MS-RDPEUDP",
+            "Microsoft RDP UDP Extension - vulnerable to massive reflection/amplification DDoS up to 85.9x",
+            "rdpeudp", vec![],
+        ),
+        (
             3702, "udp", "WS-DISCOVERY",
             "Web Services Dynamic Discovery - SOAP/XML amplification up to 153x",
             "udp_payload",
             vec![0x3C, 0xAA, 0x3E, 0x0A],
+        ),
+        (
+            5060, "udp", "SIP",
+            "Session Initiation Protocol - exposed PBX/VoIP responds to OPTIONS queries, amplifying up to 30x",
+            "sip", vec![],
         ),
         (
             5353, "udp", "mDNS",

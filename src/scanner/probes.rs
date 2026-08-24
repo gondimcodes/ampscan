@@ -209,6 +209,19 @@ fn validate_udp_response(probe_type: &str, resp: &[u8]) -> bool {
             // RIP response: length >= 24, Command == 2 (Response), Version == 1 or 2
             resp.len() >= 24 && resp[0] == 0x02 && (resp[1] == 0x01 || resp[1] == 0x02)
         }
+        "sip" => {
+            // SIP response starts with "SIP/2.0 " or contains SIP status / headers
+            let resp_str = String::from_utf8_lossy(resp);
+            resp_str.contains("SIP/2.0") || resp_str.contains("CSeq:")
+        }
+        "rdpeudp" => {
+            // MS-RDPEUDP SYN+ACK / connection response:
+            // Must be at least 8 bytes, first byte contains RDPUDP flags (e.g. RDPUDP_FLAG_SYN 0x0001 or SYN+ACK)
+            // and not ICMP IPv4 (0x4x) or IPv6 (0x6x) reflection header
+            let version_nibble = resp[0] & 0xF0;
+            let is_ip_header = version_nibble == 0x40 || version_nibble == 0x60;
+            resp.len() >= 8 && !is_ip_header && (resp[0] & 0x01 != 0 || resp.len() >= 12)
+        }
         "udp_payload" => {
             // Generic UDP payload response must be at least 12 bytes, contain non-zero data,
             // and MUST NOT start with IPv4 (0x4x) or IPv6 (0x6x) headers from ICMP reflection
@@ -405,9 +418,44 @@ fn build_payload(probe_type: &str, db_payload: Option<&[u8]>) -> Vec<u8> {
         "ldap" => build_ldap_payload(),
         "memcached" => build_memcached_payload(),
         "ripv1" => build_ripv1_payload(),
+        "sip" => build_sip_payload(),
+        "rdpeudp" => build_rdpeudp_payload(),
         "udp_payload" => db_payload.unwrap_or(&[]).to_vec(),
         _ => db_payload.unwrap_or(&[]).to_vec(),
     }
+}
+
+// ── SIP (5060/udp) ──────────────────────────────────────────────────────
+// SIP OPTIONS ping probe
+// Replicates: sipsak -s sip:ping@$IP or OPTIONS probe
+fn build_sip_payload() -> Vec<u8> {
+    b"OPTIONS sip:ping@target SIP/2.0\r\n\
+      Via: SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bK-ampscan-1\r\n\
+      Max-Forwards: 70\r\n\
+      From: <sip:scanner@ampscan>;tag=ampscan1\r\n\
+      To: <sip:ping@target>\r\n\
+      Call-ID: 1-ampscan@127.0.0.1\r\n\
+      CSeq: 1 OPTIONS\r\n\
+      Accept: application/sdp\r\n\
+      Content-Length: 0\r\n\
+      \r\n"
+        .to_vec()
+}
+
+// ── MS-RDPEUDP (3389/udp) ───────────────────────────────────────────────
+// MS-RDPEUDP SYN Datagram (RDPUDP_FLAG_SYN 0x0001 + snSourcePackets + uUpStreamMtu)
+// Specification: [MS-RDPEUDP] 2.2.2.1 RDPUDP_FEC_HEADER & 2.2.2.2 RDPUDP_SYNDATA_PAYLOAD
+fn build_rdpeudp_payload() -> Vec<u8> {
+    vec![
+        // RDPUDP_FEC_HEADER (8 bytes)
+        0x00, 0x00, 0x00, 0x00, // snSourceAck: 0
+        0x01, 0x00,             // uReceiveWindowSize: 256
+        0x01, 0x00,             // uFlags: RDPUDP_FLAG_SYN (0x0001) in LE / network order
+        // RDPUDP_SYNDATA_PAYLOAD (8 bytes)
+        0x12, 0x34, 0x56, 0x78, // snInitialSequenceNumber: 0x12345678
+        0xB0, 0x04,             // uUpStreamMtu: 1200 (0x04B0)
+        0xB0, 0x04,             // uDownStreamMtu: 1200 (0x04B0)
+    ]
 }
 
 // ── RIPv1 (520/udp) ─────────────────────────────────────────────────────
@@ -768,9 +816,32 @@ mod tests {
     }
 
     #[test]
+    fn test_sip_payload_structure() {
+        let pkt = build_sip_payload();
+        let text = String::from_utf8_lossy(&pkt);
+        assert!(text.contains("OPTIONS"));
+        assert!(text.contains("SIP/2.0"));
+        assert!(text.contains("CSeq: 1 OPTIONS"));
+    }
+
+    #[test]
+    fn test_rdpeudp_payload_structure() {
+        let pkt = build_rdpeudp_payload();
+        assert_eq!(pkt.len(), 16);
+        // Flags: RDPUDP_FLAG_SYN (0x0001) at byte 6
+        assert_eq!(pkt[6], 0x01);
+        assert_eq!(pkt[7], 0x00);
+        // Initial sequence number at bytes 8..12
+        assert_eq!(&pkt[8..12], &[0x12, 0x34, 0x56, 0x78]);
+    }
+
+    #[test]
     fn test_build_payload_dispatch() {
         // Known probe types should build non-empty payloads
-        for pt in &["dns", "mdns", "snmp", "ntp", "ssdp", "tftp", "netbios", "rpc", "ldap", "memcached", "ripv1"] {
+        for pt in &[
+            "dns", "mdns", "snmp", "ntp", "ssdp", "tftp", "netbios", "rpc", "ldap", "memcached",
+            "ripv1", "sip", "rdpeudp",
+        ] {
             let payload = build_payload(pt, None);
             assert!(!payload.is_empty(), "Probe '{}' should produce non-empty payload", pt);
         }
