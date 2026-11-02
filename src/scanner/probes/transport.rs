@@ -30,7 +30,10 @@ pub async fn send_udp_probe(
         let socket = match UdpSocket::bind(bind_addr).await {
             Ok(s) => s,
             Err(e) => {
-                let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+                let is_fd_exhaustion = e
+                    .raw_os_error()
+                    .map(|code| code == 23 || code == 24)
+                    .unwrap_or(false);
                 if is_fd_exhaustion {
                     return Err(e);
                 }
@@ -45,7 +48,10 @@ pub async fn send_udp_probe(
         // 1. Filters out all incoming datagrams not from (ip, port) at kernel level.
         // 2. Delivers ICMP Port Unreachable / Refused errors as Err(ConnectionRefused) instead of raw packet data.
         if let Err(e) = socket.connect(dest).await {
-            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            let is_fd_exhaustion = e
+                .raw_os_error()
+                .map(|code| code == 23 || code == 24)
+                .unwrap_or(false);
             if is_fd_exhaustion {
                 return Err(e);
             }
@@ -58,7 +64,10 @@ pub async fn send_udp_probe(
 
         let attempt_start = Instant::now();
         if let Err(e) = socket.send(payload).await {
-            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            let is_fd_exhaustion = e
+                .raw_os_error()
+                .map(|code| code == 23 || code == 24)
+                .unwrap_or(false);
             if is_fd_exhaustion {
                 return Err(e);
             }
@@ -78,7 +87,10 @@ pub async fn send_udp_probe(
             }
             Ok(Ok(_)) => {}
             Ok(Err(e)) => {
-                let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+                let is_fd_exhaustion = e
+                    .raw_os_error()
+                    .map(|code| code == 23 || code == 24)
+                    .unwrap_or(false);
                 if is_fd_exhaustion {
                     return Err(e);
                 }
@@ -97,7 +109,10 @@ pub async fn send_udp_probe(
     // ICMP Port Unreachable / Refused / Timeout on UDP indicate closed/filtered port (not scanner failure).
     // Only return Err for critical OS errors (e.g. FD exhaustion).
     if let Some(e) = last_err {
-        let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+        let is_fd_exhaustion = e
+            .raw_os_error()
+            .map(|code| code == 23 || code == 24)
+            .unwrap_or(false);
         if is_fd_exhaustion {
             Err(e)
         } else {
@@ -109,16 +124,15 @@ pub async fn send_udp_probe(
 }
 
 /// Execute a TCP connection probe against a target IP and port.
-pub async fn execute_tcp_probe(
-    ip: IpAddr,
-    port: u16,
-    timeout: Duration,
-) -> PortStatus {
+pub async fn execute_tcp_probe(ip: IpAddr, port: u16, timeout: Duration) -> PortStatus {
     let dest = SocketAddr::new(ip, port);
     match tokio::time::timeout(timeout, TcpStream::connect(dest)).await {
         Ok(Ok(_stream)) => PortStatus::Open, // Connection accepted
         Ok(Err(e)) => {
-            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            let is_fd_exhaustion = e
+                .raw_os_error()
+                .map(|code| code == 23 || code == 24)
+                .unwrap_or(false);
             if is_fd_exhaustion {
                 PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e))
             } else if e.kind() == io::ErrorKind::ConnectionRefused {
@@ -131,4 +145,3 @@ pub async fn execute_tcp_probe(
         Err(_) => PortStatus::Inconclusive, // Timeout
     }
 }
-

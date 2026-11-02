@@ -15,6 +15,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_tui(
     db_path: String,
     concurrency: usize,
@@ -51,11 +52,11 @@ pub async fn run_tui(
     );
 
     // Load prefixes and ports from DB on startup
-    if let Ok(mut conn) = crate::db::open_database(&db_path, &db_key) {
-        if let Ok(prefixes) = crate::db::prefix_repo::get_enabled_prefixes(&mut conn) {
+    if let Ok(conn) = crate::db::open_database(&db_path, &db_key) {
+        if let Ok(prefixes) = crate::db::prefix_repo::get_enabled_prefixes(&conn) {
             app.prefixes = prefixes;
         }
-        if let Ok(mut ports) = crate::db::port_repo::get_enabled_ports(&mut conn) {
+        if let Ok(mut ports) = crate::db::port_repo::get_enabled_ports(&conn) {
             if check_php {
                 if !ports.iter().any(|p| p.port == 80) {
                     ports.push(crate::db::models::Port {
@@ -63,7 +64,8 @@ pub async fn run_tui(
                         port: 80,
                         protocol: "tcp".to_string(),
                         name: "HTTP".to_string(),
-                        description: "HTTP - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                        description: "HTTP - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)"
+                            .to_string(),
                         probe_type: "php_http".to_string(),
                         probe_payload: None,
                         enabled: true,
@@ -77,7 +79,8 @@ pub async fn run_tui(
                         port: 443,
                         protocol: "tcp".to_string(),
                         name: "HTTPS".to_string(),
-                        description: "HTTPS - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                        description: "HTTPS - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)"
+                            .to_string(),
                         probe_type: "php_https".to_string(),
                         probe_payload: None,
                         enabled: true,
@@ -114,25 +117,29 @@ pub async fn run_tui(
                             // If --pdf flag was supplied via CLI, generate PDF report automatically
                             if app.pdf_export {
                                 let scan_id = uuid::Uuid::new_v4().to_string();
-                                let prefixes: Vec<String> = app.prefixes.iter().map(|p| p.prefix.clone()).collect();
-                                let mut report = crate::scanner::result::ScanReport::new(scan_id, prefixes);
+                                let prefixes: Vec<String> =
+                                    app.prefixes.iter().map(|p| p.prefix.clone()).collect();
+                                let mut report =
+                                    crate::scanner::result::ScanReport::new(scan_id, prefixes);
                                 report.check_php = app.check_php;
-                                
+
                                 // Calculate total unique IPs tested from logs
-                                let mut unique_ips: Vec<_> = app.logs.iter().map(|l| l.ip).collect();
+                                let mut unique_ips: Vec<_> =
+                                    app.logs.iter().map(|l| l.ip).collect();
                                 unique_ips.sort();
                                 unique_ips.dedup();
-                                
+
                                 report.total_ips = unique_ips.len();
                                 report.total_probes = app.stats.total_probes.max(app.logs.len());
                                 report.results = app.logs.clone();
-                                
+
                                 // Preserve start time if available
                                 if let Some(start_inst) = app.stats.start_time {
                                     let elapsed = start_inst.elapsed();
-                                    report.started_at = chrono::Utc::now() - chrono::Duration::from_std(elapsed).unwrap_or_default();
+                                    report.started_at = chrono::Utc::now()
+                                        - chrono::Duration::from_std(elapsed).unwrap_or_default();
                                 }
-                                
+
                                 report.finalize();
 
                                 let app_config = crate::report::AppConfig::load();
@@ -177,13 +184,18 @@ pub async fn run_tui(
                 events::UserAction::StartSingleScan => {
                     if !app.is_scanning {
                         let target_str = app.single_ip_input.trim().to_string();
-                        let is_valid = !target_str.is_empty() 
-                            && (IpAddr::from_str(&target_str).is_ok() || ipnet::IpNet::from_str(&target_str).is_ok());
+                        let is_valid = !target_str.is_empty()
+                            && (IpAddr::from_str(&target_str).is_ok()
+                                || ipnet::IpNet::from_str(&target_str).is_ok());
 
                         if target_str.is_empty() {
-                            app.status_message = Some("Please enter a target IP or CIDR prefix in Target Scan tab".to_string());
+                            app.status_message = Some(
+                                "Please enter a target IP or CIDR prefix in Target Scan tab"
+                                    .to_string(),
+                            );
                         } else if !is_valid {
-                            app.status_message = Some(format!("Invalid IP or CIDR Prefix: '{}'", target_str));
+                            app.status_message =
+                                Some(format!("Invalid IP or CIDR Prefix: '{}'", target_str));
                         } else {
                             app.is_scanning = true;
                             app.clear_scan_data();
@@ -196,14 +208,18 @@ pub async fn run_tui(
                             let timeout_secs: u64 = app.timeout_input.parse().unwrap_or(3);
                             let retries: usize = app.retries_input.parse().unwrap_or(2);
 
-                            app.status_message = Some(format!("Starting target scan for {}...", target_str));
+                            app.status_message =
+                                Some(format!("Starting target scan for {}...", target_str));
 
                             tokio::spawn(async move {
                                 let mut conn_res = crate::db::open_database(&db_path, &db_key);
                                 let conn = match conn_res {
                                     Ok(ref mut c) => c,
                                     Err(e) => {
-                                        let _ = tx.send(TuiEvent::ScanError(format!("DB open error: {}", e)));
+                                        let _ = tx.send(TuiEvent::ScanError(format!(
+                                            "DB open error: {}",
+                                            e
+                                        )));
                                         return;
                                     }
                                 };
@@ -211,7 +227,10 @@ pub async fn run_tui(
                                 let ports = match crate::db::port_repo::get_enabled_ports(conn) {
                                     Ok(p) => p,
                                     Err(e) => {
-                                        let _ = tx.send(TuiEvent::ScanError(format!("DB port error: {}", e)));
+                                        let _ = tx.send(TuiEvent::ScanError(format!(
+                                            "DB port error: {}",
+                                            e
+                                        )));
                                         return;
                                     }
                                 };
@@ -223,7 +242,14 @@ pub async fn run_tui(
                                     check_php,
                                 };
 
-                                if let Err(e) = crate::scanner::scan_target_with_channel(&target_str, ports, &config, Some(tx.clone())).await {
+                                if let Err(e) = crate::scanner::scan_target_with_channel(
+                                    &target_str,
+                                    ports,
+                                    &config,
+                                    Some(tx.clone()),
+                                )
+                                .await
+                                {
                                     let _ = tx.send(TuiEvent::ScanError(e.to_string()));
                                 } else {
                                     let _ = tx.send(TuiEvent::ScanFinished);
@@ -245,14 +271,16 @@ pub async fn run_tui(
                         let timeout_secs: u64 = app.timeout_input.parse().unwrap_or(3);
                         let retries: usize = app.retries_input.parse().unwrap_or(2);
 
-                        app.status_message = Some("Starting full database CIDR scan...".to_string());
+                        app.status_message =
+                            Some("Starting full database CIDR scan...".to_string());
 
                         tokio::spawn(async move {
                             let mut conn_res = crate::db::open_database(&db_path, &db_key);
                             let conn = match conn_res {
                                 Ok(ref mut c) => c,
                                 Err(e) => {
-                                    let _ = tx.send(TuiEvent::ScanError(format!("DB open error: {}", e)));
+                                    let _ = tx
+                                        .send(TuiEvent::ScanError(format!("DB open error: {}", e)));
                                     return;
                                 }
                             };
@@ -260,21 +288,28 @@ pub async fn run_tui(
                             let ports = match crate::db::port_repo::get_enabled_ports(conn) {
                                 Ok(p) => p,
                                 Err(e) => {
-                                    let _ = tx.send(TuiEvent::ScanError(format!("DB port error: {}", e)));
+                                    let _ = tx
+                                        .send(TuiEvent::ScanError(format!("DB port error: {}", e)));
                                     return;
                                 }
                             };
 
-                            let prefixes = match crate::db::prefix_repo::get_enabled_prefixes(conn) {
+                            let prefixes = match crate::db::prefix_repo::get_enabled_prefixes(conn)
+                            {
                                 Ok(p) => p,
                                 Err(e) => {
-                                    let _ = tx.send(TuiEvent::ScanError(format!("DB prefix error: {}", e)));
+                                    let _ = tx.send(TuiEvent::ScanError(format!(
+                                        "DB prefix error: {}",
+                                        e
+                                    )));
                                     return;
                                 }
                             };
 
                             if prefixes.is_empty() {
-                                let _ = tx.send(TuiEvent::ScanError("No enabled prefixes found in database".to_string()));
+                                let _ = tx.send(TuiEvent::ScanError(
+                                    "No enabled prefixes found in database".to_string(),
+                                ));
                                 return;
                             }
 
@@ -285,7 +320,14 @@ pub async fn run_tui(
                                 check_php,
                             };
 
-                            if let Err(e) = crate::scanner::run_scan_with_channel(ports, prefixes, &config, Some(tx.clone())).await {
+                            if let Err(e) = crate::scanner::run_scan_with_channel(
+                                ports,
+                                prefixes,
+                                &config,
+                                Some(tx.clone()),
+                            )
+                            .await
+                            {
                                 let _ = tx.send(TuiEvent::ScanError(e.to_string()));
                             } else {
                                 let _ = tx.send(TuiEvent::ScanFinished);

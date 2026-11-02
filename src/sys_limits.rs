@@ -2,21 +2,28 @@
 //!
 //! Handles Unix file descriptor limits (ulimit) automatically for high concurrency scanning.
 
-#[cfg(unix)]
-use libc::{getrlimit, setrlimit, rlimit, RLIMIT_NOFILE};
 use anyhow::Result;
+#[cfg(unix)]
+use libc::{getrlimit, rlimit, setrlimit, RLIMIT_NOFILE};
 
 /// Attempt to raise the process file descriptor limit (ulimit -n) to match
 /// the requested concurrency (plus some safety overhead).
 #[cfg(unix)]
 pub fn try_raise_fd_limit(required_concurrency: usize) -> Result<()> {
     unsafe {
-        let mut limits = rlimit { rlim_cur: 0, rlim_max: 0 };
+        let mut limits = rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
         if getrlimit(RLIMIT_NOFILE, &mut limits) != 0 {
-            return Err(anyhow::anyhow!("Failed to retrieve file descriptor limits (getrlimit)"));
+            return Err(anyhow::anyhow!(
+                "Failed to retrieve file descriptor limits (getrlimit)"
+            ));
         }
 
+        #[allow(clippy::unnecessary_cast)]
         let rlim_cur = limits.rlim_cur as u64;
+        #[allow(clippy::unnecessary_cast)]
         let rlim_max = limits.rlim_max as u64;
 
         // We need at least required_concurrency + extra padding for standard streams,
@@ -26,7 +33,7 @@ pub fn try_raise_fd_limit(required_concurrency: usize) -> Result<()> {
         if rlim_cur < needed {
             // Cap at hard limit
             let target_limit = needed.min(rlim_max);
-            
+
             let new_limits = rlimit {
                 rlim_cur: target_limit as _,
                 rlim_max: limits.rlim_max,
@@ -78,4 +85,3 @@ mod tests {
         assert!(res.is_ok());
     }
 }
-

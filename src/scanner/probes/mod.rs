@@ -26,10 +26,12 @@ pub async fn execute_probe(
     let (status, latency_ms, custom_desc) = match port_config.protocol.as_str() {
         "tcp" => {
             if port_config.probe_type == "php_http" {
-                let (st, lat, desc) = http::execute_php_probe(ip, port_config.port, false, timeout).await;
+                let (st, lat, desc) =
+                    http::execute_php_probe(ip, port_config.port, false, timeout).await;
                 (st, lat, Some(desc))
             } else if port_config.probe_type == "php_https" {
-                let (st, lat, desc) = http::execute_php_probe(ip, port_config.port, true, timeout).await;
+                let (st, lat, desc) =
+                    http::execute_php_probe(ip, port_config.port, true, timeout).await;
                 (st, lat, Some(desc))
             } else {
                 let start = Instant::now();
@@ -48,12 +50,27 @@ pub async fn execute_probe(
             } else if port_config.probe_type == "snmp" {
                 validate::execute_snmp_probe(ip, port_config.port, timeout, retries).await
             } else {
-                let payload = payloads::build_payload(&port_config.probe_type, port_config.probe_payload.as_deref());
-                validate::execute_udp_probe(ip, port_config.port, &port_config.probe_type, &payload, timeout, retries).await
+                let payload = payloads::build_payload(
+                    &port_config.probe_type,
+                    port_config.probe_payload.as_deref(),
+                );
+                validate::execute_udp_probe(
+                    ip,
+                    port_config.port,
+                    &port_config.probe_type,
+                    &payload,
+                    timeout,
+                    retries,
+                )
+                .await
             };
             (st, lat, None)
         }
-        other => (PortStatus::Error(format!("Unknown protocol: {}", other)), None, None),
+        other => (
+            PortStatus::Error(format!("Unknown protocol: {}", other)),
+            None,
+            None,
+        ),
     };
 
     let description = custom_desc.unwrap_or_else(|| port_config.description.clone());
@@ -69,4 +86,3 @@ pub async fn execute_probe(
         timestamp: Utc::now(),
     }
 }
-

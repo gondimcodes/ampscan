@@ -38,7 +38,14 @@ pub fn insert_port(
     c.execute(
         "INSERT OR IGNORE INTO ports (port, protocol, name, description, probe_type, probe_payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![port as i64, protocol, name, description, probe_type, probe_payload],
+        rusqlite::params![
+            port as i64,
+            protocol,
+            name,
+            description,
+            probe_type,
+            probe_payload
+        ],
     )
     .context("Failed to insert port")?;
     Ok(c.last_insert_rowid())
@@ -48,7 +55,10 @@ pub fn insert_port(
 pub fn list_ports(conn: &DbConn) -> Result<Vec<Port>> {
     let c = lock_db(conn)?;
     let mut stmt = c
-        .prepare(&format!("SELECT {} FROM ports ORDER BY port, protocol", SELECT_COLS))
+        .prepare(&format!(
+            "SELECT {} FROM ports ORDER BY port, protocol",
+            SELECT_COLS
+        ))
         .context("Failed to prepare port list query")?;
     let ports = stmt
         .query_map([], row_to_port)?
@@ -128,9 +138,16 @@ pub fn seed_default_ports(conn: &DbConn) -> Result<()> {
         } else {
             Some(p.payload)
         };
-        insert_port(conn, p.port, p.protocol, p.name, p.description, p.probe_type, payload_opt)?;
+        insert_port(
+            conn,
+            p.port,
+            p.protocol,
+            p.name,
+            p.description,
+            p.probe_type,
+            payload_opt,
+        )?;
     }
 
     Ok(())
 }
-

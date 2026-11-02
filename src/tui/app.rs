@@ -41,6 +41,7 @@ pub enum TuiEvent {
     ScanError(String),
 }
 
+#[derive(Default)]
 pub struct ScanStats {
     pub total_probes: usize,
     pub completed_probes: usize,
@@ -50,31 +51,18 @@ pub struct ScanStats {
     pub start_time: Option<Instant>,
 }
 
-impl Default for ScanStats {
-    fn default() -> Self {
-        Self {
-            total_probes: 0,
-            completed_probes: 0,
-            vulnerable_count: 0,
-            protected_count: 0,
-            closed_count: 0,
-            start_time: None,
-        }
-    }
-}
-
 pub struct App {
     pub active_tab: Tab,
     pub should_quit: bool,
     pub is_scanning: bool,
-    
+
     // Scan Data & Logs
     pub stats: ScanStats,
     pub logs: Vec<ProbeResult>,
     pub filtered_log_indices: Vec<usize>,
     pub port_stats: std::collections::HashMap<u16, (usize, usize)>,
     pub selected_log_index: usize,
-    
+
     // DB Data Cache for TUI
     pub prefixes: Vec<Prefix>,
     pub ports: Vec<Port>,
@@ -90,7 +78,7 @@ pub struct App {
     pub timeout_input: String,
     pub retries_input: String,
     pub focused_field: usize,
-    
+
     pub pdf_export: bool,
     pub pdf_output: String,
     pub pdf_client_name: Option<String>,
@@ -102,6 +90,7 @@ pub struct App {
 }
 
 impl App {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db_path: String,
         db_key: String,
@@ -145,13 +134,19 @@ impl App {
     }
 
     pub fn next_tab(&mut self) {
-        let current_idx = Tab::ALL.iter().position(|t| t == &self.active_tab).unwrap_or(0);
+        let current_idx = Tab::ALL
+            .iter()
+            .position(|t| t == &self.active_tab)
+            .unwrap_or(0);
         let next_idx = (current_idx + 1) % Tab::ALL.len();
         self.active_tab = Tab::ALL[next_idx];
     }
 
     pub fn prev_tab(&mut self) {
-        let current_idx = Tab::ALL.iter().position(|t| t == &self.active_tab).unwrap_or(0);
+        let current_idx = Tab::ALL
+            .iter()
+            .position(|t| t == &self.active_tab)
+            .unwrap_or(0);
         let prev_idx = if current_idx == 0 {
             Tab::ALL.len() - 1
         } else {
@@ -176,7 +171,8 @@ impl App {
     pub fn add_probe_result(&mut self, result: ProbeResult) {
         let is_finding = matches!(
             result.status,
-            crate::scanner::result::PortStatus::Open | crate::scanner::result::PortStatus::OpenProtected
+            crate::scanner::result::PortStatus::Open
+                | crate::scanner::result::PortStatus::OpenProtected
         );
 
         match &result.status {
@@ -193,7 +189,7 @@ impl App {
             _ => self.stats.closed_count += 1,
         }
         self.stats.completed_probes += 1;
-        
+
         let new_idx = self.logs.len();
         self.logs.push(result);
 

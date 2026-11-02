@@ -47,4 +47,3 @@ fn find_config_file() -> Option<std::path::PathBuf> {
     }
     None
 }
-

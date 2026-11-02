@@ -48,12 +48,7 @@ pub fn cmd_prefix(db: &DbConn, cmd: &PrefixCommands) -> Result<()> {
             description,
         } => {
             let id = prefix_repo::insert_prefix(db, prefix, description)?;
-            println!(
-                "{} Prefix {} added with ID {}",
-                "✓".green(),
-                prefix,
-                id
-            );
+            println!("{} Prefix {} added with ID {}", "✓".green(), prefix, id);
         }
 
         PrefixCommands::Edit {
@@ -82,4 +77,3 @@ pub fn cmd_prefix(db: &DbConn, cmd: &PrefixCommands) -> Result<()> {
     }
     Ok(())
 }
-

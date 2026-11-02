@@ -5,6 +5,8 @@
 
 /// Authentication module
 pub mod auth;
+/// Command Line Interface
+pub mod cli;
 /// Database repository and models
 pub mod db;
 /// PDF Report generation
@@ -15,6 +17,3 @@ pub mod scanner;
 pub mod sys_limits;
 /// Interactive Terminal UI
 pub mod tui;
-/// Command Line Interface
-pub mod cli;
-

@@ -60,7 +60,9 @@ impl PdfWriter {
 
     /// Create a new page and reset Y to the top.
     pub fn new_page(&mut self) {
-        self.doc.pages.push(PdfPage::new(Mm(PAGE_W), Mm(PAGE_H), vec![]));
+        self.doc
+            .pages
+            .push(PdfPage::new(Mm(PAGE_W), Mm(PAGE_H), vec![]));
         self.page_index = self.doc.pages.len() - 1;
         self.y = PAGE_H - MARGIN;
     }
@@ -128,8 +130,14 @@ impl PdfWriter {
         let page = &mut self.doc.pages[self.page_index];
         let line = Line {
             points: vec![
-                LinePoint { p: Point::new(Mm(MARGIN), Mm(self.y)), bezier: false },
-                LinePoint { p: Point::new(Mm(PAGE_W - MARGIN), Mm(self.y)), bezier: false },
+                LinePoint {
+                    p: Point::new(Mm(MARGIN), Mm(self.y)),
+                    bezier: false,
+                },
+                LinePoint {
+                    p: Point::new(Mm(PAGE_W - MARGIN), Mm(self.y)),
+                    bezier: false,
+                },
             ],
             is_closed: false,
         };
@@ -141,8 +149,8 @@ impl PdfWriter {
     pub fn save(self, path: &str) -> Result<()> {
         let mut warnings = Vec::new();
         let bytes = self.doc.save(&PdfSaveOptions::default(), &mut warnings);
-        std::fs::write(path, bytes).with_context(|| format!("Failed to create PDF file: {}", path))?;
+        std::fs::write(path, bytes)
+            .with_context(|| format!("Failed to create PDF file: {}", path))?;
         Ok(())
     }
 }
-

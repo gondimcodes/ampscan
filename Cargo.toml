@@ -17,8 +17,8 @@ clap = { version = "4", features = ["derive", "env"] }
 tokio = { version = "1", features = ["full"] }
 
 # TLS client for HTTPS probe (pure Rust, zero C deps)
-tokio-rustls = "0.24"
-rustls = { version = "0.21", features = ["dangerous_configuration"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging"] }
+rustls-pki-types = "1"
 
 # Password hashing (Argon2id)
 argon2 = "0.5"

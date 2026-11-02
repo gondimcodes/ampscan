@@ -170,9 +170,7 @@ pub fn generate_pdf(
 
     // Emission Date and Time in UTC
     let emission_time = chrono::Utc::now();
-    let emission_str = emission_time
-        .format("%d/%m/%Y %H:%M:%S UTC")
-        .to_string();
+    let emission_str = emission_time.format("%d/%m/%Y %H:%M:%S UTC").to_string();
     w.text(
         &format!("Emission Date: {}", emission_str),
         BODY_SIZE,
@@ -526,4 +524,3 @@ pub fn generate_pdf(
     w.save(output_path)?;
     Ok(())
 }
-

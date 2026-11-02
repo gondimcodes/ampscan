@@ -33,12 +33,7 @@ pub fn cmd_user(db: &DbConn, cmd: &UserCommands) -> Result<()> {
         UserCommands::Add { username } => {
             let password = auth::prompt_new_password()?;
             let id = user_repo::create_user(db, username, &password)?;
-            println!(
-                "{} User '{}' created with ID {}",
-                "✓".green(),
-                username,
-                id
-            );
+            println!("{} User '{}' created with ID {}", "✓".green(), username, id);
         }
 
         UserCommands::ChangePassword { username } => {
@@ -55,4 +50,3 @@ pub fn cmd_user(db: &DbConn, cmd: &UserCommands) -> Result<()> {
     }
     Ok(())
 }
-

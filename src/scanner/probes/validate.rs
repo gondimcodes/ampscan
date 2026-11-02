@@ -49,9 +49,15 @@ pub async fn execute_dns_probe(
         }
         Ok(None) => (PortStatus::Inconclusive, None),
         Err(e) => {
-            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            let is_fd_exhaustion = e
+                .raw_os_error()
+                .map(|code| code == 23 || code == 24)
+                .unwrap_or(false);
             if is_fd_exhaustion {
-                (PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)), None)
+                (
+                    PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)),
+                    None,
+                )
             } else {
                 (PortStatus::Error(e.to_string()), None)
             }
@@ -72,7 +78,10 @@ pub async fn execute_snmp_probe(
 
             // Valid SNMP response starts with 0x30 (SEQUENCE) and is at least 15 bytes long
             // Must contain 0xA2 (GetResponse-PDU) tag or 0xA8 (Report/Inform PDU)
-            if response.len() >= 15 && response[0] == 0x30 && response.iter().any(|&b| b == 0xA2 || b == 0xA8) {
+            if response.len() >= 15
+                && response[0] == 0x30
+                && response.iter().any(|&b| b == 0xA2 || b == 0xA8)
+            {
                 (PortStatus::Open, Some(lat_ms))
             } else {
                 (PortStatus::Inconclusive, None)
@@ -80,9 +89,15 @@ pub async fn execute_snmp_probe(
         }
         Ok(None) => (PortStatus::Inconclusive, None),
         Err(e) => {
-            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            let is_fd_exhaustion = e
+                .raw_os_error()
+                .map(|code| code == 23 || code == 24)
+                .unwrap_or(false);
             if is_fd_exhaustion {
-                (PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)), None)
+                (
+                    PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)),
+                    None,
+                )
             } else {
                 (PortStatus::Error(e.to_string()), None)
             }
@@ -111,9 +126,15 @@ pub async fn execute_udp_probe(
         }
         Ok(None) => (PortStatus::Inconclusive, None),
         Err(e) => {
-            let is_fd_exhaustion = e.raw_os_error().map(|code| code == 23 || code == 24).unwrap_or(false);
+            let is_fd_exhaustion = e
+                .raw_os_error()
+                .map(|code| code == 23 || code == 24)
+                .unwrap_or(false);
             if is_fd_exhaustion {
-                (PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)), None)
+                (
+                    PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)),
+                    None,
+                )
             } else {
                 (PortStatus::Error(e.to_string()), None)
             }
@@ -141,12 +162,16 @@ pub fn validate_udp_response(probe_type: &str, resp: &[u8]) -> bool {
         "ssdp" => {
             // SSDP Response MUST contain HTTP header indicator "HTTP/1.1" or "ST:" or "LOCATION:"
             let resp_str = String::from_utf8_lossy(resp);
-            resp_str.contains("HTTP/1.1") || resp_str.contains("ST:") || resp_str.contains("LOCATION:")
+            resp_str.contains("HTTP/1.1")
+                || resp_str.contains("ST:")
+                || resp_str.contains("LOCATION:")
         }
         "memcached" => {
             // Memcached stats response contains "STAT " or "END" or binary protocol magic 0x81
             let resp_str = String::from_utf8_lossy(resp);
-            resp_str.contains("STAT ") || resp_str.contains("END") || (resp.len() >= 4 && resp[0] == 0x81)
+            resp_str.contains("STAT ")
+                || resp_str.contains("END")
+                || (resp.len() >= 4 && resp[0] == 0x81)
         }
         "rpc" => {
             // RPC reply message MUST be at least 16 bytes, XID matching and MsgType = 1 (Reply)
@@ -224,4 +249,3 @@ pub fn validate_udp_response(probe_type: &str, resp: &[u8]) -> bool {
         }
     }
 }
-

@@ -40,8 +40,8 @@ pub fn prompt_new_password() -> Result<String> {
         }
     }
     loop {
-        let password = rpassword::prompt_password("Password: ")
-            .context("Failed to read password")?;
+        let password =
+            rpassword::prompt_password("Password: ").context("Failed to read password")?;
         if password.len() < 8 {
             eprintln!("Password must be at least 8 characters. Try again.");
             continue;
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn test_env_passwords_combined() {
         // Run env tests sequentially to avoid parallel test race conditions on the environment variable
-        
+
         // 1. test_prompt_password_from_env
         std::env::set_var("AMPSCAN_PASS", "my_env_password_123");
         let result = prompt_password();

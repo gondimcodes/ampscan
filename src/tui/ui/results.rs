@@ -22,7 +22,14 @@ pub fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
     // ── 1. Left Panel: Verified Findings Table ─────────────────────────────
     let header_cells = ["#", "IP Address", "Port", "Service", "Status", "Latency"]
         .iter()
-        .map(|h| Span::styled(*h, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
+        .map(|h| {
+            Span::styled(
+                *h,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+        });
     let header = Row::new(header_cells).height(1).bottom_margin(1);
 
     let total_findings = app.filtered_log_indices.len();
@@ -56,15 +63,29 @@ pub fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
             let is_selected = abs_idx == selected_idx;
             let log = &app.logs[log_idx];
             let (status_str, status_style) = match &log.status {
-                PortStatus::Open => ("VULNERABLE", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-                PortStatus::OpenProtected => ("Open/Protected", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                PortStatus::Open => (
+                    "VULNERABLE",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                PortStatus::OpenProtected => (
+                    "Open/Protected",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 _ => ("Other", Style::default().fg(Color::DarkGray)),
             };
 
-            let latency_str = log.response_time_ms.map(|ms| format!("{} ms", ms)).unwrap_or_else(|| "-".to_string());
+            let latency_str = log
+                .response_time_ms
+                .map(|ms| format!("{} ms", ms))
+                .unwrap_or_else(|| "-".to_string());
 
             let row_style = if is_selected {
-                Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             };
@@ -76,14 +97,22 @@ pub fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
                 Span::raw(log.service_name.clone()),
                 Span::styled(status_str, status_style),
                 Span::raw(latency_str),
-            ]).style(row_style)
+            ])
+            .style(row_style)
         });
 
-    let display_counter = if total_findings == 0 { 0 } else { selected_idx + 1 };
+    let display_counter = if total_findings == 0 {
+        0
+    } else {
+        selected_idx + 1
+    };
     let title_text = if total_findings == 0 {
         " Verified Findings (0 Detected) ".to_string()
     } else {
-        format!(" Verified Findings ({}/{} entries) ", display_counter, total_findings)
+        format!(
+            " Verified Findings ({}/{} entries) ",
+            display_counter, total_findings
+        )
     };
 
     let table = Table::new(
@@ -103,9 +132,14 @@ pub fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(table, left_area);
 
     // ── 2. Right Panel: Port Statistics Table ──────────────────────────────
-    let stat_header_cells = ["Service (Port)", "Vuln", "Prot"]
-        .iter()
-        .map(|h| Span::styled(*h, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
+    let stat_header_cells = ["Service (Port)", "Vuln", "Prot"].iter().map(|h| {
+        Span::styled(
+            *h,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+    });
     let stat_header = Row::new(stat_header_cells).height(1).bottom_margin(1);
 
     struct PortStat {
@@ -129,7 +163,9 @@ pub fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
         use std::collections::BTreeMap;
         let mut map: BTreeMap<(u16, String, String), (usize, usize)> = BTreeMap::new();
         for log in &app.logs {
-            let entry = map.entry((log.port, log.service_name.clone(), log.protocol.clone())).or_insert((0, 0));
+            let entry = map
+                .entry((log.port, log.service_name.clone(), log.protocol.clone()))
+                .or_insert((0, 0));
             if log.status == PortStatus::Open {
                 entry.0 += 1;
             } else if log.status == PortStatus::OpenProtected {
@@ -153,7 +189,9 @@ pub fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
         };
 
         let prot_style = if stat.protected > 0 {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
@@ -180,4 +218,3 @@ pub fn render_results_viewer(frame: &mut Frame, app: &App, area: Rect) {
 
     frame.render_widget(stat_table, right_area);
 }
-

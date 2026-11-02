@@ -23,7 +23,13 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                             app.should_quit = true;
                             return Ok(UserAction::None);
                         }
-                        KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == ':' || c == '/' || c.is_ascii_hexdigit() => {
+                        KeyCode::Char(c)
+                            if c.is_ascii_digit()
+                                || c == '.'
+                                || c == ':'
+                                || c == '/'
+                                || c.is_ascii_hexdigit() =>
+                        {
                             app.single_ip_input.push(c);
                             return Ok(UserAction::None);
                         }
@@ -43,7 +49,11 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                                 app.check_php = !app.check_php;
                                 app.status_message = Some(format!(
                                     "PHP2Shell check: {}",
-                                    if app.check_php { "ENABLED (80/443)" } else { "DISABLED" }
+                                    if app.check_php {
+                                        "ENABLED (80/443)"
+                                    } else {
+                                        "DISABLED"
+                                    }
                                 ));
                                 return Ok(UserAction::None);
                             } else if c.is_ascii_digit() {
@@ -87,7 +97,11 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                             return Ok(UserAction::None);
                         }
                         KeyCode::Up => {
-                            app.focused_field = if app.focused_field == 0 { 2 } else { app.focused_field - 1 };
+                            app.focused_field = if app.focused_field == 0 {
+                                2
+                            } else {
+                                app.focused_field - 1
+                            };
                             return Ok(UserAction::None);
                         }
                         _ => {}
@@ -111,8 +125,12 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                     KeyCode::Left => app.prev_tab(),
 
                     // Global Actions
-                    KeyCode::Char('f') | KeyCode::Char('F') => return Ok(UserAction::StartFullScan),
-                    KeyCode::Char('s') | KeyCode::Char('S') => return Ok(UserAction::StartSingleScan),
+                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                        return Ok(UserAction::StartFullScan)
+                    }
+                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                        return Ok(UserAction::StartSingleScan)
+                    }
 
                     // List navigation & Scrolling
                     KeyCode::Down => {
@@ -129,7 +147,8 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                     KeyCode::PageDown => {
                         let total = app.get_filtered_findings_count();
                         if total > 0 {
-                            app.selected_log_index = (app.selected_log_index + 15).min(total.saturating_sub(1));
+                            app.selected_log_index =
+                                (app.selected_log_index + 15).min(total.saturating_sub(1));
                         }
                     }
                     KeyCode::PageUp => {

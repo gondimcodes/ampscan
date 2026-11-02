@@ -37,4 +37,3 @@ pub fn get_manual_command(service: &str, port: u16, protocol: &str) -> String {
         }
     }
 }
-

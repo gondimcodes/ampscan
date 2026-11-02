@@ -14,7 +14,10 @@ pub fn open_and_auth(cli: &Cli) -> Result<DbConn> {
 
     // Ensure database file exists before trying to open it
     if !std::path::Path::new(db_path).exists() {
-        anyhow::bail!("Database file '{}' not found. Run 'ampscan init' first.", db_path);
+        anyhow::bail!(
+            "Database file '{}' not found. Run 'ampscan init' first.",
+            db_path
+        );
     }
 
     let mut key = db::get_db_key()?;
@@ -58,4 +61,3 @@ pub fn prompt_username() -> Result<String> {
     }
     Ok(username)
 }
-

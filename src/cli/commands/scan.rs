@@ -25,9 +25,7 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
         } => {
             let ports = port_repo::get_enabled_ports(db)?;
             if ports.is_empty() {
-                anyhow::bail!(
-                    "No enabled ports. Use 'ampscan port list' to view ports."
-                );
+                anyhow::bail!("No enabled ports. Use 'ampscan port list' to view ports.");
             }
 
             let prefixes = match prefix {
@@ -101,7 +99,9 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             if *check_php {
                 println!(
                     "  Audit Profile: {}",
-                    "Full Amplification + PHP2Shell (CVE-2026-109618 / CVE-2026-109619)".yellow().bold()
+                    "Full Amplification + PHP2Shell (CVE-2026-109618 / CVE-2026-109619)"
+                        .yellow()
+                        .bold()
                 );
             }
 
@@ -145,7 +145,8 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                         _ => (Cell::new(r.ip.to_string()), Cell::new("")),
                     };
 
-                    let time_str = r.response_time_ms
+                    let time_str = r
+                        .response_time_ms
                         .map(|t| format!("{} ms", t))
                         .unwrap_or_else(|| "-".to_string());
                     let mut time_cell = Cell::new(time_str);
@@ -178,9 +179,15 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
 
             // Generate PDF only if requested via --pdf flag
             if *pdf {
-                println!("\n{} Generating PDF report: {}", "📄".to_string(), output);
+                println!("\n📄 Generating PDF report: {}", output);
                 let app_config = report::AppConfig::load();
-                report::generate_pdf(&report, output, client_name.as_deref(), recipient.as_deref(), &app_config)?;
+                report::generate_pdf(
+                    &report,
+                    output,
+                    client_name.as_deref(),
+                    recipient.as_deref(),
+                    &app_config,
+                )?;
                 println!("{} Report generated successfully!", "✓".green().bold());
             } else {
                 println!(
@@ -312,4 +319,3 @@ mod tests {
         assert_eq!(truncate("abc", 0), "...");
     }
 }
-

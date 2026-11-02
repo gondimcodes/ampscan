@@ -2,8 +2,7 @@ use super::models::Prefix;
 use super::{lock_db, DbConn};
 use anyhow::{Context, Result};
 
-const SELECT_COLS: &str =
-    "id, prefix, description, ip_version, enabled, created_at, updated_at";
+const SELECT_COLS: &str = "id, prefix, description, ip_version, enabled, created_at, updated_at";
 
 fn row_to_prefix(row: &rusqlite::Row) -> rusqlite::Result<Prefix> {
     Ok(Prefix {

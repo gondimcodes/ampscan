@@ -51,12 +51,12 @@ pub fn build_rdpeudp_payload() -> Vec<u8> {
     vec![
         // RDPUDP_FEC_HEADER (8 bytes)
         0x00, 0x00, 0x00, 0x00, // snSourceAck: 0
-        0x01, 0x00,             // uReceiveWindowSize: 256
-        0x01, 0x00,             // uFlags: RDPUDP_FLAG_SYN (0x0001) in LE / network order
+        0x01, 0x00, // uReceiveWindowSize: 256
+        0x01, 0x00, // uFlags: RDPUDP_FLAG_SYN (0x0001) in LE / network order
         // RDPUDP_SYNDATA_PAYLOAD (8 bytes)
         0x12, 0x34, 0x56, 0x78, // snInitialSequenceNumber: 0x12345678
-        0xB0, 0x04,             // uUpStreamMtu: 1200 (0x04B0)
-        0xB0, 0x04,             // uDownStreamMtu: 1200 (0x04B0)
+        0xB0, 0x04, // uUpStreamMtu: 1200 (0x04B0)
+        0xB0, 0x04, // uDownStreamMtu: 1200 (0x04B0)
     ]
 }
 
@@ -65,8 +65,8 @@ pub fn build_rdpeudp_payload() -> Vec<u8> {
 pub fn build_ripv1_payload() -> Vec<u8> {
     vec![
         0x01, 0x01, 0x00, 0x00, // Command: Request (1), Version: RIPv1 (1), Must Be Zero (0)
-        0x00, 0x00,             // Address Family Identifier: Unspecified (0)
-        0x00, 0x00,             // Route Tag / Must Be Zero
+        0x00, 0x00, // Address Family Identifier: Unspecified (0)
+        0x00, 0x00, // Route Tag / Must Be Zero
         0x00, 0x00, 0x00, 0x00, // IP Address: 0.0.0.0
         0x00, 0x00, 0x00, 0x00, // Subnet Mask: 0.0.0.0
         0x00, 0x00, 0x00, 0x00, // Next Hop: 0.0.0.0
@@ -89,7 +89,7 @@ pub fn build_dns_payload_with_txid() -> (Vec<u8>, u16) {
     pkt.extend_from_slice(&[0x00, 0x00]); // Answers: 0
     pkt.extend_from_slice(&[0x00, 0x00]); // Authority: 0
     pkt.extend_from_slice(&[0x00, 0x00]); // Additional: 0
-    // Question: google.com A IN
+                                          // Question: google.com A IN
     pkt.push(6); // length of "google"
     pkt.extend_from_slice(b"google");
     pkt.push(3); // length of "com"
@@ -116,7 +116,7 @@ pub fn build_mdns_payload() -> Vec<u8> {
     pkt.extend_from_slice(&[0x00, 0x00]); // Answers: 0
     pkt.extend_from_slice(&[0x00, 0x00]); // Authority: 0
     pkt.extend_from_slice(&[0x00, 0x00]); // Additional: 0
-    // Question: _services._dns-sd._udp.local PTR IN
+                                          // Question: _services._dns-sd._udp.local PTR IN
     pkt.push(9);
     pkt.extend_from_slice(b"_services");
     pkt.push(7);
@@ -137,26 +137,17 @@ pub fn build_mdns_payload() -> Vec<u8> {
 pub fn build_snmp_payload() -> Vec<u8> {
     vec![
         // SEQUENCE (overall message)
-        0x30, 0x29,
-        // INTEGER: version = 1 (SNMPv2c)
-        0x02, 0x01, 0x01,
-        // OCTET STRING: community = "public"
+        0x30, 0x29, // INTEGER: version = 1 (SNMPv2c)
+        0x02, 0x01, 0x01, // OCTET STRING: community = "public"
         0x04, 0x06, 0x70, 0x75, 0x62, 0x6C, 0x69, 0x63,
         // GetRequest-PDU (context-specific, constructed, tag 0)
-        0xA0, 0x1C,
-        // INTEGER: request-id = 1
-        0x02, 0x04, 0x00, 0x00, 0x00, 0x01,
-        // INTEGER: error-status = 0
-        0x02, 0x01, 0x00,
-        // INTEGER: error-index = 0
-        0x02, 0x01, 0x00,
-        // SEQUENCE OF varbinds
-        0x30, 0x0E,
-        // SEQUENCE (one varbind)
-        0x30, 0x0C,
-        // OID: 1.3.6.1.2.1.1.1.0 (sysDescr.0)
-        0x06, 0x08, 0x2B, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00,
-        // NULL value
+        0xA0, 0x1C, // INTEGER: request-id = 1
+        0x02, 0x04, 0x00, 0x00, 0x00, 0x01, // INTEGER: error-status = 0
+        0x02, 0x01, 0x00, // INTEGER: error-index = 0
+        0x02, 0x01, 0x00, // SEQUENCE OF varbinds
+        0x30, 0x0E, // SEQUENCE (one varbind)
+        0x30, 0x0C, // OID: 1.3.6.1.2.1.1.1.0 (sysDescr.0)
+        0x06, 0x08, 0x2B, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00, // NULL value
         0x05, 0x00,
     ]
 }
@@ -167,18 +158,12 @@ pub fn build_snmp_payload() -> Vec<u8> {
 pub fn build_ntp_payload() -> Vec<u8> {
     vec![
         // LI=0, VN=2, Mode=6 (control) → 00 010 110 = 0x16
-        0x16,
-        // R=0, E=0, M=0, OpCode=2 (readvar) → 0 0 0 00010 = 0x02
-        0x02,
-        // Sequence number (16-bit)
-        0x00, 0x01,
-        // Status (16-bit)
-        0x00, 0x00,
-        // Association ID (16-bit)
-        0x00, 0x00,
-        // Offset (16-bit)
-        0x00, 0x00,
-        // Count (16-bit)
+        0x16, // R=0, E=0, M=0, OpCode=2 (readvar) → 0 0 0 00010 = 0x02
+        0x02, // Sequence number (16-bit)
+        0x00, 0x01, // Status (16-bit)
+        0x00, 0x00, // Association ID (16-bit)
+        0x00, 0x00, // Offset (16-bit)
+        0x00, 0x00, // Count (16-bit)
         0x00, 0x00,
     ]
 }
@@ -221,15 +206,13 @@ pub fn build_netbios_payload() -> Vec<u8> {
     pkt.extend_from_slice(&[0x00, 0x00]); // Answers: 0
     pkt.extend_from_slice(&[0x00, 0x00]); // Authority: 0
     pkt.extend_from_slice(&[0x00, 0x00]); // Additional: 0
-    // Name: "*" encoded as CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-    // '*' = 0x2A → first nibble (0x2) + 'A' = 'C', second nibble (0xA) + 'A' = 'K'
-    // Remaining 15 null bytes → 30 'A's
+                                          // Name: "*" encoded as CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+                                          // '*' = 0x2A → first nibble (0x2) + 'A' = 'C', second nibble (0xA) + 'A' = 'K'
+                                          // Remaining 15 null bytes → 30 'A's
     pkt.push(0x20); // Name length: 32
     pkt.push(b'C');
     pkt.push(b'K');
-    for _ in 0..30 {
-        pkt.push(b'A');
-    }
+    pkt.resize(pkt.len() + 30, b'A');
     pkt.push(0x00); // Name terminator
     pkt.extend_from_slice(&[0x00, 0x21]); // Type: NBSTAT
     pkt.extend_from_slice(&[0x00, 0x01]); // Class: IN
@@ -242,24 +225,15 @@ pub fn build_netbios_payload() -> Vec<u8> {
 pub fn build_rpc_payload() -> Vec<u8> {
     vec![
         // XID (transaction ID)
-        0x00, 0x00, 0x00, 0x01,
-        // Message Type: Call (0)
-        0x00, 0x00, 0x00, 0x00,
-        // RPC Version: 2
-        0x00, 0x00, 0x00, 0x02,
-        // Program: 100000 (portmapper) = 0x000186A0
-        0x00, 0x01, 0x86, 0xA0,
-        // Program Version: 2
-        0x00, 0x00, 0x00, 0x02,
-        // Procedure: 4 (DUMP)
-        0x00, 0x00, 0x00, 0x04,
-        // Credentials: AUTH_NULL
-        0x00, 0x00, 0x00, 0x00,
-        // Credentials length: 0
-        0x00, 0x00, 0x00, 0x00,
-        // Verifier: AUTH_NULL
-        0x00, 0x00, 0x00, 0x00,
-        // Verifier length: 0
+        0x00, 0x00, 0x00, 0x01, // Message Type: Call (0)
+        0x00, 0x00, 0x00, 0x00, // RPC Version: 2
+        0x00, 0x00, 0x00, 0x02, // Program: 100000 (portmapper) = 0x000186A0
+        0x00, 0x01, 0x86, 0xA0, // Program Version: 2
+        0x00, 0x00, 0x00, 0x02, // Procedure: 4 (DUMP)
+        0x00, 0x00, 0x00, 0x04, // Credentials: AUTH_NULL
+        0x00, 0x00, 0x00, 0x00, // Credentials length: 0
+        0x00, 0x00, 0x00, 0x00, // Verifier: AUTH_NULL
+        0x00, 0x00, 0x00, 0x00, // Verifier length: 0
         0x00, 0x00, 0x00, 0x00,
     ]
 }
@@ -270,26 +244,16 @@ pub fn build_rpc_payload() -> Vec<u8> {
 pub fn build_ldap_payload() -> Vec<u8> {
     vec![
         // SEQUENCE
-        0x30, 0x25,
-        // INTEGER: messageID = 1
-        0x02, 0x01, 0x01,
-        // SearchRequest (APPLICATION 3)
-        0x63, 0x20,
-        // OCTET STRING: baseObject = "" (empty)
-        0x04, 0x00,
-        // ENUMERATED: scope = 0 (base)
-        0x0A, 0x01, 0x00,
-        // ENUMERATED: derefAliases = 0 (never)
-        0x0A, 0x01, 0x00,
-        // INTEGER: sizeLimit = 0
-        0x02, 0x01, 0x00,
-        // INTEGER: timeLimit = 0
-        0x02, 0x01, 0x00,
-        // BOOLEAN: typesOnly = FALSE
-        0x01, 0x01, 0x00,
-        // Filter: present "objectClass" (context [7])
-        0x87, 0x0B,
-        0x6F, 0x62, 0x6A, 0x65, 0x63, 0x74, 0x43, 0x6C, 0x61, 0x73, 0x73,
+        0x30, 0x25, // INTEGER: messageID = 1
+        0x02, 0x01, 0x01, // SearchRequest (APPLICATION 3)
+        0x63, 0x20, // OCTET STRING: baseObject = "" (empty)
+        0x04, 0x00, // ENUMERATED: scope = 0 (base)
+        0x0A, 0x01, 0x00, // ENUMERATED: derefAliases = 0 (never)
+        0x0A, 0x01, 0x00, // INTEGER: sizeLimit = 0
+        0x02, 0x01, 0x00, // INTEGER: timeLimit = 0
+        0x02, 0x01, 0x00, // BOOLEAN: typesOnly = FALSE
+        0x01, 0x01, 0x00, // Filter: present "objectClass" (context [7])
+        0x87, 0x0B, 0x6F, 0x62, 0x6A, 0x65, 0x63, 0x74, 0x43, 0x6C, 0x61, 0x73, 0x73,
         // SEQUENCE: attributes = [] (empty)
         0x30, 0x00,
     ]
@@ -441,11 +405,26 @@ mod tests {
     fn test_build_payload_dispatch() {
         // Known probe types should build non-empty payloads
         for pt in &[
-            "dns", "mdns", "snmp", "ntp", "ssdp", "tftp", "netbios", "rpc", "ldap", "memcached",
-            "ripv1", "sip", "rdpeudp",
+            "dns",
+            "mdns",
+            "snmp",
+            "ntp",
+            "ssdp",
+            "tftp",
+            "netbios",
+            "rpc",
+            "ldap",
+            "memcached",
+            "ripv1",
+            "sip",
+            "rdpeudp",
         ] {
             let payload = build_payload(pt, None);
-            assert!(!payload.is_empty(), "Probe '{}' should produce non-empty payload", pt);
+            assert!(
+                !payload.is_empty(),
+                "Probe '{}' should produce non-empty payload",
+                pt
+            );
         }
         // udp_payload with no DB data should return empty
         let empty = build_payload("udp_payload", None);
@@ -456,4 +435,3 @@ mod tests {
         assert_eq!(result, data);
     }
 }
-

@@ -202,4 +202,3 @@ pub enum ScanCommands {
         check_php: bool,
     },
 }
-

@@ -69,7 +69,8 @@ pub async fn run_scan_with_channel(
                 port: 80,
                 protocol: "tcp".to_string(),
                 name: "HTTP".to_string(),
-                description: "HTTP - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                description: "HTTP - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)"
+                    .to_string(),
                 probe_type: "php_http".to_string(),
                 probe_payload: None,
                 enabled: true,
@@ -83,7 +84,8 @@ pub async fn run_scan_with_channel(
                 port: 443,
                 protocol: "tcp".to_string(),
                 name: "HTTPS".to_string(),
-                description: "HTTPS - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                description: "HTTPS - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)"
+                    .to_string(),
                 probe_type: "php_https".to_string(),
                 probe_payload: None,
                 enabled: true,
@@ -206,7 +208,9 @@ pub async fn run_scan_with_channel(
                             }
                         }
                         if let Some(ref sender) = tx {
-                            let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(probe_result.clone()));
+                            let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(
+                                probe_result.clone(),
+                            ));
                         }
                         report.results.push(probe_result);
                         done += 1;
@@ -228,8 +232,7 @@ pub async fn run_scan_with_channel(
 
             let port_config = Arc::clone(port_config);
             join_set.spawn(async move {
-                let result =
-                    probes::execute_probe(ip, &port_config, timeout, retries).await;
+                let result = probes::execute_probe(ip, &port_config, timeout, retries).await;
                 drop(permit); // Release slot when probe completes
                 result
             });
@@ -252,7 +255,9 @@ pub async fn run_scan_with_channel(
                     }
                 }
                 if let Some(ref sender) = tx {
-                    let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(probe_result.clone()));
+                    let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(
+                        probe_result.clone(),
+                    ));
                 }
                 report.results.push(probe_result);
                 done += 1;
@@ -329,11 +334,7 @@ fn draw_progress(done: usize, total: usize, is_tui: bool) {
 
     eprint!(
         "\r  Progress: [{}{}] {:.1}% ({}/{})",
-        bar_filled,
-        bar_empty,
-        percent,
-        done,
-        total
+        bar_filled, bar_empty, percent, done, total
     );
     let _ = std::io::stderr().flush();
 }
@@ -408,7 +409,11 @@ pub async fn scan_target_with_channel(
         let _ = sender.send(crate::tui::app::TuiEvent::ScanStarted(total_probes));
     }
 
-    let ip_ver = if ips.first().map(|ip| ip.is_ipv6()).unwrap_or(false) { 6 } else { 4 };
+    let ip_ver = if ips.first().map(|ip| ip.is_ipv6()).unwrap_or(false) {
+        6
+    } else {
+        4
+    };
 
     let dummy_prefix = Prefix {
         id: 0,

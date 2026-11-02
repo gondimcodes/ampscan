@@ -4,37 +4,66 @@
 //! headers (X-Powered-By and Server) without sending memory corruption or exploit payloads.
 
 use crate::scanner::result::PortStatus;
+use rustls_pki_types::{CertificateDer, ServerName, UnixTime};
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio_rustls::rustls::client::{ServerCertVerified, ServerCertVerifier};
-use tokio_rustls::rustls::{Certificate, ClientConfig, Error as RustlsError, ServerName};
+use tokio_rustls::rustls::client::danger::{
+    HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
+};
+use tokio_rustls::rustls::{
+    ClientConfig, DigitallySignedStruct, Error as RustlsError, SignatureScheme,
+};
 use tokio_rustls::TlsConnector;
 
 /// Null certificate verifier to allow scanning direct IP addresses over TLS
 /// without failing due to Hostname/SAN mismatch.
+#[derive(Debug)]
 struct NoCertVerifier;
 
 impl ServerCertVerifier for NoCertVerifier {
     fn verify_server_cert(
         &self,
-        _end_entity: &Certificate,
-        _intermediates: &[Certificate],
-        _server_name: &ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
         _ocsp_response: &[u8],
-        _now: std::time::SystemTime,
+        _now: UnixTime,
     ) -> Result<ServerCertVerified, RustlsError> {
         Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, RustlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        tokio_rustls::rustls::crypto::ring::default_provider()
+            .signature_verification_algorithms
+            .supported_schemes()
     }
 }
 
 fn build_tls_connector() -> TlsConnector {
     let config = ClientConfig::builder()
-        .with_safe_defaults()
+        .dangerous()
         .with_custom_certificate_verifier(Arc::new(NoCertVerifier))
         .with_no_client_auth();
     TlsConnector::from(Arc::new(config))
@@ -145,12 +174,10 @@ pub fn assess_php_version(version: &str) -> PhpAssessment {
                     }
                 }
             }
-            _ if minor <= 1 => {
-                PhpAssessment::Vulnerable {
-                    version: version.to_string(),
-                    fixed_in: "8.2.35+ (8.1 is EOL)",
-                }
-            }
+            _ if minor <= 1 => PhpAssessment::Vulnerable {
+                version: version.to_string(),
+                fixed_in: "8.2.35+ (8.1 is EOL)",
+            },
             _ => PhpAssessment::NotVulnerable {
                 version: version.to_string(),
             },
@@ -185,7 +212,10 @@ pub async fn execute_php_probe(
     let stream = match tokio::time::timeout(connect_timeout, TcpStream::connect(dest)).await {
         Ok(Ok(s)) => s,
         Ok(Err(e)) => {
-            let is_fd = e.raw_os_error().map(|c| c == 23 || c == 24).unwrap_or(false);
+            let is_fd = e
+                .raw_os_error()
+                .map(|c| c == 23 || c == 24)
+                .unwrap_or(false);
             if is_fd {
                 return (
                     PortStatus::Error(format!("CRITICAL_FD_EXHAUSTION: {}", e)),
@@ -240,9 +270,9 @@ pub async fn execute_php_probe(
         String::from_utf8_lossy(&buf).to_string()
     } else {
         let connector = build_tls_connector();
-        let server_name = match ServerName::try_from(ip.to_string().as_str()) {
+        let server_name = match ServerName::try_from(ip.to_string()) {
             Ok(sn) => sn,
-            Err(_) => match ServerName::try_from("target") {
+            Err(_) => match ServerName::try_from("target".to_string()) {
                 Ok(sn) => sn,
                 Err(_) => {
                     return (
@@ -421,11 +451,11 @@ mod tests {
             }
         );
 
-        let headers_no_php = "HTTP/1.1 200 OK\r\nServer: nginx/1.26.0\r\nContent-Type: text/html\r\n\r\n";
+        let headers_no_php =
+            "HTTP/1.1 200 OK\r\nServer: nginx/1.26.0\r\nContent-Type: text/html\r\n\r\n";
         assert_eq!(
             parse_php_version_from_headers(headers_no_php),
             PhpAssessment::NoPhpHeader
         );
     }
 }
-

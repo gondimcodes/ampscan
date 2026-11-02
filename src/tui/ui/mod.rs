@@ -59,7 +59,10 @@ fn render_tabs(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect::<Vec<_>>();
 
-    let selected_index = Tab::ALL.iter().position(|t| t == &app.active_tab).unwrap_or(0);
+    let selected_index = Tab::ALL
+        .iter()
+        .position(|t| t == &app.active_tab)
+        .unwrap_or(0);
 
     let tabs = Tabs::new(titles)
         .block(
@@ -86,18 +89,21 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         "Press [S] to scan target IP | [F] for Full CIDR Scan"
     };
 
-    let status = app
-        .status_message
-        .as_deref()
-        .unwrap_or(default_status);
+    let status = app.status_message.as_deref().unwrap_or(default_status);
 
     let footer_text = vec![Line::from(vec![
-        Span::styled(" HOTKEYS: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Span::raw("[Tab] Switch View  |  [F] Full Scan  |  [S] Single Target  |  [Q] Quit    --    "),
+        Span::styled(
+            " HOTKEYS: ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(
+            "[Tab] Switch View  |  [F] Full Scan  |  [S] Single Target  |  [Q] Quit    --    ",
+        ),
         Span::styled(status, Style::default().fg(Color::Green)),
     ])];
 
     let p = Paragraph::new(footer_text).block(Block::default().borders(Borders::ALL));
     frame.render_widget(p, area);
 }
-

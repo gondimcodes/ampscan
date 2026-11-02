@@ -18,8 +18,11 @@ pub type DbConn = Arc<Mutex<Connection>>;
 /// while holding the lock, every subsequent access via unwrap() also panics.
 /// This helper converts the PoisonError into a recoverable error.
 pub(crate) fn lock_db(conn: &DbConn) -> Result<MutexGuard<'_, Connection>> {
-    conn.lock()
-        .map_err(|_| anyhow::anyhow!("Database lock is poisoned (a thread panicked while holding it). Restart the process."))
+    conn.lock().map_err(|_| {
+        anyhow::anyhow!(
+            "Database lock is poisoned (a thread panicked while holding it). Restart the process."
+        )
+    })
 }
 
 /// Open (or create) an encrypted database at the given path with the given key.
@@ -140,7 +143,9 @@ fn run_migrations(conn: &DbConn) -> Result<()> {
     );
     let _ = c.execute(
         "UPDATE ports SET description = ?1 WHERE port = 137 AND protocol = 'udp'",
-        rusqlite::params!["NetBIOS Name Service - exposure reveals network information and allows amplification"],
+        rusqlite::params![
+            "NetBIOS Name Service - exposure reveals network information and allows amplification"
+        ],
     );
 
     Ok(())

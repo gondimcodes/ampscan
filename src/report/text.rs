@@ -73,12 +73,23 @@ pub fn wrap_command(cmd: &str, max_chars: usize) -> Vec<String> {
             // Long token with no spaces (e.g., hex payload): break char by char
             let mut remaining: &str = word;
             while !remaining.is_empty() {
-                let avail = if current.is_empty() { limit } else { limit.saturating_sub(current.len() + 1) };
-                if avail == 0 || (!current.is_empty() && current.len() + 1 + remaining.chars().take(1).count() > limit) {
+                let avail = if current.is_empty() {
+                    limit
+                } else {
+                    limit.saturating_sub(current.len() + 1)
+                };
+                if avail == 0
+                    || (!current.is_empty()
+                        && current.len() + 1 + remaining.chars().take(1).count() > limit)
+                {
                     result.push(current.clone());
                     current = CONT_INDENT.to_string();
                 }
-                let take: usize = remaining.chars().count().min(if current.trim().is_empty() { cont_max } else { cont_max.saturating_sub(current.len()) });
+                let take: usize = remaining.chars().count().min(if current.trim().is_empty() {
+                    cont_max
+                } else {
+                    cont_max.saturating_sub(current.len())
+                });
                 if take == 0 {
                     break;
                 }
@@ -156,7 +167,11 @@ mod wrap_command_tests {
         let lines = wrap_command("word1 word2 word3 word4", 12);
         assert!(lines.len() > 1, "should wrap into multiple lines");
         for line in lines.iter().skip(1) {
-            assert!(line.starts_with("    "), "continuation must be indented: {:?}", line);
+            assert!(
+                line.starts_with("    "),
+                "continuation must be indented: {:?}",
+                line
+            );
         }
     }
 
@@ -183,4 +198,3 @@ mod wrap_command_tests {
         assert!(lines[0].is_empty());
     }
 }
-

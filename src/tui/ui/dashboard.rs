@@ -27,7 +27,8 @@ pub fn render_dashboard(frame: &mut Frame, app: &App, area: Rect) {
 
     // Hacker Style Custom Progress Bar
     let pct_float = if app.stats.total_probes > 0 {
-        ((app.stats.completed_probes as f64 / app.stats.total_probes as f64) * 100.0).clamp(0.0, 100.0)
+        ((app.stats.completed_probes as f64 / app.stats.total_probes as f64) * 100.0)
+            .clamp(0.0, 100.0)
     } else {
         0.0
     };
@@ -40,15 +41,38 @@ pub fn render_dashboard(frame: &mut Frame, app: &App, area: Rect) {
     let empty_bar = "░".repeat(empty_len);
 
     let progress_line = Line::from(vec![
-        Span::styled("[ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::styled(filled_bar, Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[ ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            filled_bar,
+            Style::default()
+                .fg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(empty_bar, Style::default().fg(Color::DarkGray)),
-        Span::styled(" ] ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::styled(format!("{:>5.1}%", pct_float), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " ] ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{:>5.1}%", pct_float),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
     ]);
 
-    let progress_widget = Paragraph::new(vec![Line::from(""), progress_line])
-        .block(Block::default().borders(Borders::ALL).title(" 💀 SCAN PROGRESS "));
+    let progress_widget = Paragraph::new(vec![Line::from(""), progress_line]).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" 💀 SCAN PROGRESS "),
+    );
     frame.render_widget(progress_widget, left_chunks[0]);
 
     // Metrics Summary
@@ -64,7 +88,9 @@ pub fn render_dashboard(frame: &mut Frame, app: &App, area: Rect) {
             Span::raw("Open / Protected:  "),
             Span::styled(
                 app.stats.protected_count.to_string(),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
@@ -76,15 +102,27 @@ pub fn render_dashboard(frame: &mut Frame, app: &App, area: Rect) {
         ]),
     ];
 
-    let stats_paragraph = Paragraph::new(stats_text)
-        .block(Block::default().borders(Borders::ALL).title(" Findings Summary "));
+    let stats_paragraph = Paragraph::new(stats_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Findings Summary "),
+    );
     frame.render_widget(stats_paragraph, left_chunks[1]);
 
     // System & Scanner Info
     let info_text = vec![
-        Line::from(Span::styled("Scan Overview", Style::default().add_modifier(Modifier::UNDERLINED))),
-        Line::from(format!("Status: {}", if app.is_scanning { "SCANNING" } else { "IDLE" })),
-        Line::from(format!("Probes Completed: {} / {}", app.stats.completed_probes, app.stats.total_probes)),
+        Line::from(Span::styled(
+            "Scan Overview",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )),
+        Line::from(format!(
+            "Status: {}",
+            if app.is_scanning { "SCANNING" } else { "IDLE" }
+        )),
+        Line::from(format!(
+            "Probes Completed: {} / {}",
+            app.stats.completed_probes, app.stats.total_probes
+        )),
         Line::from(format!("Concurrency Limit: {}", app.concurrency_input)),
         Line::from(format!("Timeout Per Probe: {}s", app.timeout_input)),
     ];
@@ -100,19 +138,37 @@ pub fn render_dashboard(frame: &mut Frame, app: &App, area: Rect) {
 fn render_logs_table(frame: &mut Frame, app: &App, area: Rect) {
     let header_cells = ["IP Address", "Port", "Service", "Status", "Latency"]
         .iter()
-        .map(|h| Span::styled(*h, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
+        .map(|h| {
+            Span::styled(
+                *h,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+        });
     let header = Row::new(header_cells).height(1).bottom_margin(1);
 
     let rows = app.logs.iter().rev().take(100).map(|log| {
         let (status_str, status_style) = match &log.status {
-            PortStatus::Open => ("Vulnerable", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            PortStatus::OpenProtected => ("Open/Protected", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            PortStatus::Open => (
+                "Vulnerable",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            PortStatus::OpenProtected => (
+                "Open/Protected",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             PortStatus::Closed => ("Closed", Style::default().fg(Color::DarkGray)),
             PortStatus::Inconclusive => ("Inconclusive", Style::default().fg(Color::DarkGray)),
             PortStatus::Error(_) => ("Error", Style::default().fg(Color::Red)),
         };
 
-        let latency_str = log.response_time_ms.map(|ms| format!("{} ms", ms)).unwrap_or_else(|| "-".to_string());
+        let latency_str = log
+            .response_time_ms
+            .map(|ms| format!("{} ms", ms))
+            .unwrap_or_else(|| "-".to_string());
 
         Row::new(vec![
             Span::raw(log.ip.to_string()),
@@ -134,8 +190,11 @@ fn render_logs_table(frame: &mut Frame, app: &App, area: Rect) {
         ],
     )
     .header(header)
-    .block(Block::default().borders(Borders::ALL).title(" Live Probing Activity "));
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Live Probing Activity "),
+    );
 
     frame.render_widget(table, area);
 }
-

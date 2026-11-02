@@ -35,11 +35,7 @@ pub async fn cmd_init(cli: &Cli) -> Result<()> {
         let username = prompt_username()?;
         let password = auth::prompt_new_password()?;
         user_repo::create_user(&db, &username, &password)?;
-        println!(
-            "  {} User '{}' successfully created",
-            "✓".green(),
-            username
-        );
+        println!("  {} User '{}' successfully created", "✓".green(), username);
     } else {
         println!(
             "  {} Users already exist, skipping admin creation",
@@ -59,4 +55,3 @@ pub async fn cmd_init(cli: &Cli) -> Result<()> {
 
     Ok(())
 }
-

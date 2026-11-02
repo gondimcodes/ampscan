@@ -22,7 +22,10 @@ pub fn authenticate(conn: &DbConn, username: &str, password: &str) -> Result<Use
     if auth::verify_password(password, &user.password_hash)? {
         Ok(user)
     } else {
-        anyhow::bail!("Authentication failed: invalid password for user '{}'", username)
+        anyhow::bail!(
+            "Authentication failed: invalid password for user '{}'",
+            username
+        )
     }
 }
 

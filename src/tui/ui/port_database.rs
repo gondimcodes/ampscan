@@ -11,7 +11,14 @@ use ratatui::{
 pub fn render_port_database(frame: &mut Frame, app: &App, area: Rect) {
     let header_cells = ["Port", "Proto", "Name", "Probe Type", "Description"]
         .iter()
-        .map(|h| Span::styled(*h, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
+        .map(|h| {
+            Span::styled(
+                *h,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+        });
     let header = Row::new(header_cells).height(1).bottom_margin(1);
 
     let rows = app.ports.iter().map(|p| {
@@ -35,8 +42,11 @@ pub fn render_port_database(frame: &mut Frame, app: &App, area: Rect) {
         ],
     )
     .header(header)
-    .block(Block::default().borders(Borders::ALL).title(" Registered Amplification Signatures "));
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Registered Amplification Signatures "),
+    );
 
     frame.render_widget(table, area);
 }
-
