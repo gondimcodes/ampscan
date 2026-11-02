@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-11-01
+
+### Added
+- **Passive HTTP/HTTPS PHP2Shell Vulnerability Auditing (`--check-php`)**:
+  - Added non-intrusive banner inspection for ports `80/tcp` (HTTP) and `443/tcp` (HTTPS) to detect critical PHP vulnerabilities:
+    - **CVE-2026-109618**: Out-Of-Memory memory corruption.
+    - **CVE-2026-109619**: Worker process Use-After-Free condition.
+  - **Two-Phase Probing Model** (`src/scanner/probes/http.rs`):
+    - Fast TCP connection check capped at 1,500ms preventing semaphore starvation on silent firewall `DROP` packets.
+    - Zero active exploit payloads: inspects `X-Powered-By` and `Server` headers via RFC-compliant `HEAD / HTTP/1.1`.
+    - Integrated pure Rust TLS client (`tokio-rustls` with permissive IP certificate verifier) for HTTPS inspection on direct IP addresses.
+  - **SemVer Vulnerability Assessment**:
+    - Validates PHP versions against upstream PHP Foundation fixes: Branch 8.5 (< 8.5.12), Branch 8.4 (< 8.4.27), Branch 8.3 (< 8.3.36), Branch 8.2 (< 8.2.35), and legacy EOL branches (<= 8.1).
+  - **CLI & TUI Integration**:
+    - Global `--check-php` CLI parameter available on `scan run`, `scan single`, and `tui`.
+    - Live dynamic toggle in TUI: press `P` in the Settings tab to toggle PHP2Shell checking on the fly.
+  - **Executive PDF Reporting & Client Mitigation**:
+    - Automatic generation of dedicated PHP2Shell advisory section in PDF reports.
+    - Documented guidance on Linux distribution backports (Debian, Ubuntu, RHEL) and actionable client mitigations: `pm.max_requests = 1` in PHP-FPM (`www.conf`) and `expose_php = Off` in `php.ini`.
+
 ## [1.4.8] - 2026-10-17
 
 ### Changed

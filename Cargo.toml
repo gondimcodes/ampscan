@@ -1,6 +1,6 @@
 [package]
 name = "ampscan"
-version = "1.4.8"
+version = "1.5.0"
 edition = "2021"
 description = "DDoS Amplification Port Testing Tool with TUI"
 authors = ["Marcelo Gondim"]
@@ -15,6 +15,10 @@ clap = { version = "4", features = ["derive", "env"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
+
+# TLS client for HTTPS probe (pure Rust, zero C deps)
+tokio-rustls = "0.24"
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
 
 # Password hashing (Argon2id)
 argon2 = "0.5"

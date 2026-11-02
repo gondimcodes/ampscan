@@ -21,6 +21,7 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             pdf,
             client_name,
             recipient,
+            check_php,
         } => {
             let ports = port_repo::get_enabled_ports(db)?;
             if ports.is_empty() {
@@ -97,11 +98,18 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                 timeout.to_string().bold(),
                 retries.to_string().bold()
             );
+            if *check_php {
+                println!(
+                    "  Audit Profile: {}",
+                    "Full Amplification + PHP2Shell (CVE-2026-109618 / CVE-2026-109619)".yellow().bold()
+                );
+            }
 
             let config = ScanConfig {
                 concurrency: *concurrency,
                 timeout: Duration::from_secs(*timeout),
                 retries: *retries,
+                check_php: *check_php,
             };
 
             let report = scanner::run_scan(ports, prefixes, &config).await?;
@@ -187,6 +195,7 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             timeout,
             concurrency,
             retries,
+            check_php,
         } => {
             let ip_addr: IpAddr = ip
                 .parse()
@@ -215,6 +224,7 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                 concurrency: *concurrency,
                 timeout: Duration::from_secs(*timeout),
                 retries: *retries,
+                check_php: *check_php,
             };
 
             let results = scanner::scan_single_ip(ip_addr, ports, &config).await?;

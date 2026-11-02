@@ -39,7 +39,14 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                 } else if app.active_tab == Tab::Settings {
                     match key.code {
                         KeyCode::Char(c) => {
-                            if c.is_ascii_digit() {
+                            if c == 'p' || c == 'P' {
+                                app.check_php = !app.check_php;
+                                app.status_message = Some(format!(
+                                    "PHP2Shell check: {}",
+                                    if app.check_php { "ENABLED (80/443)" } else { "DISABLED" }
+                                ));
+                                return Ok(UserAction::None);
+                            } else if c.is_ascii_digit() {
                                 if app.focused_field == 0 {
                                     let candidate = format!("{}{}", app.concurrency_input, c);
                                     if let Ok(val) = candidate.parse::<usize>() {

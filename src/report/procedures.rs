@@ -26,6 +26,8 @@ pub fn get_manual_command(service: &str, port: u16, protocol: &str) -> String {
         "DVR-DHCPDISCOVER" | "DVR-DHCP" | "DVR" => format!("echo -ne '\\xff' | nc -u -w 2 <IP> {} | xxd", port),
         "MT4145" => "nc -z -v -w 3 <IP> 4145".to_string(),
         "MT5678" => "nc -z -v -w 3 <IP> 5678".to_string(),
+        "HTTP" => "curl -I -m 3 http://<IP>".to_string(),
+        "HTTPS" => "curl -kI -m 3 https://<IP>".to_string(),
         _ => {
             if protocol.to_lowercase() == "tcp" {
                 format!("nc -z -v -w 3 <IP> {}", port)

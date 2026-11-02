@@ -214,6 +214,14 @@ pub fn generate_pdf(
         BODY_LH,
         false,
     );
+    if report.check_php {
+        w.text(
+            "Audit Profile: Full Amplification + PHP2Shell (CVE-2026-109618 / CVE-2026-109619)",
+            BODY_SIZE,
+            BODY_LH,
+            true,
+        );
+    }
 
     // ── Executive Summary ──────────────────────────────────────────
     w.skip(15.0);
@@ -423,6 +431,73 @@ pub fn generate_pdf(
             }
             w.skip(3.0);
         }
+    }
+
+    // ── PHP2Shell Advisory & Mitigation Section (if --check-php was used) ──
+    if report.check_php || report.has_php_findings() {
+        w.new_page();
+        w.text(
+            "PHP2Shell Security Advisory (CVE-2026-109618 / CVE-2026-109619)",
+            HEADING_SIZE,
+            HEADING_LH,
+            true,
+        );
+        w.hline();
+        w.skip(2.0);
+
+        let advisory_p1 = "Critical vulnerabilities disclosed in October 2026 (CVSS 9.2) affect the core PHP interpreter from version 5.4 up to 8.5.11 (CVE-2026-109618 memory corruption on Out-Of-Memory and CVE-2026-109619 Use-After-Free in worker processes). AmpScan audits these ports using non-intrusive HTTP HEAD banner grabbing without sending exploit payloads.";
+        for line in wrap_text(advisory_p1, 95) {
+            w.text(&line, BODY_SIZE, BODY_LH, false);
+        }
+        w.skip(4.0);
+
+        w.text(
+            "Official Upstream Patched Versions (PHP Foundation):",
+            SUBHEADING_SIZE,
+            SUBHEADING_LH,
+            true,
+        );
+        w.text("  * Branch 8.5: PHP >= 8.5.12", BODY_SIZE, BODY_LH, false);
+        w.text("  * Branch 8.4: PHP >= 8.4.27", BODY_SIZE, BODY_LH, false);
+        w.text("  * Branch 8.3: PHP >= 8.3.36", BODY_SIZE, BODY_LH, false);
+        w.text("  * Branch 8.2: PHP >= 8.2.35", BODY_SIZE, BODY_LH, false);
+        w.text(
+            "  * Versions 8.1, 7.x, 5.x: EOL (No upstream patch - upgrade immediately)",
+            BODY_SIZE,
+            BODY_LH,
+            false,
+        );
+        w.skip(4.0);
+
+        w.text(
+            "Mitigation & Hardening Guidelines for Clients:",
+            SUBHEADING_SIZE,
+            SUBHEADING_LH,
+            true,
+        );
+        w.text(
+            "  1. Definitive OS Update: Run 'apt update && apt upgrade' (Debian/Ubuntu) or equivalent.",
+            BODY_SIZE,
+            BODY_LH,
+            false,
+        );
+        let backport_note = "     Important Note on Linux Backports: Linux distributions (Debian, Ubuntu, RHEL) frequently backport security fixes while preserving package version strings. Advise clients to verify system package changelogs if the reported banner indicates a vulnerable upstream version.";
+        for line in wrap_text(backport_note, 95) {
+            w.text(&line, SMALL_SIZE, SMALL_LH, false);
+        }
+        w.text(
+            "  2. PHP-FPM Pool Mitigation: Set 'pm.max_requests = 1' in www.conf to force worker recycling.",
+            BODY_SIZE,
+            BODY_LH,
+            false,
+        );
+        w.text(
+            "  3. Information Disclosure: Set 'expose_php = Off' in php.ini to prevent version discovery.",
+            BODY_SIZE,
+            BODY_LH,
+            false,
+        );
+        w.skip(5.0);
     }
 
     // ── Disclaimer ─────────────────────────────────────────────────

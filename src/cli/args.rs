@@ -66,6 +66,9 @@ pub enum Commands {
         /// PDF report recipient (e.g., manager or department name)
         #[arg(long)]
         recipient: Option<String>,
+        /// Audit HTTP (80) and HTTPS (443) for PHP2Shell (CVE-2026-109618 / CVE-2026-109619)
+        #[arg(long)]
+        check_php: bool,
     },
 }
 
@@ -177,6 +180,9 @@ pub enum ScanCommands {
         /// PDF report recipient (e.g., manager or department name)
         #[arg(long)]
         recipient: Option<String>,
+        /// Audit HTTP (80) and HTTPS (443) for PHP2Shell (CVE-2026-109618 / CVE-2026-109619)
+        #[arg(long)]
+        check_php: bool,
     },
     /// Test a single IP against all enabled ports
     Single {
@@ -191,6 +197,9 @@ pub enum ScanCommands {
         /// Number of retries for UDP probes (default is 2, giving 3 total attempts)
         #[arg(short, long, default_value = "2")]
         retries: usize,
+        /// Audit HTTP (80) and HTTPS (443) for PHP2Shell (CVE-2026-109618 / CVE-2026-109619)
+        #[arg(long)]
+        check_php: bool,
     },
 }
 

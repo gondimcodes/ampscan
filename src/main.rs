@@ -75,6 +75,7 @@ async fn main() -> Result<()> {
             output,
             client_name,
             recipient,
+            check_php,
         } => {
             let db_p = cli.db_path.as_deref().unwrap_or("");
             if db_p.is_empty() {
@@ -89,6 +90,7 @@ async fn main() -> Result<()> {
                 output.clone(),
                 client_name.clone(),
                 recipient.clone(),
+                *check_php,
             )
             .await
         }

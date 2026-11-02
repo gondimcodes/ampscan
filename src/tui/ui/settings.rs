@@ -15,7 +15,7 @@ pub fn render_settings(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(3), // Concurrency
             Constraint::Length(3), // Timeout
             Constraint::Length(3), // Retries
-            Constraint::Length(6), // Instructions (compact height)
+            Constraint::Length(8), // Instructions
         ])
         .split(area);
 
@@ -53,6 +53,14 @@ pub fn render_settings(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(Span::styled("Scanner Settings Instructions:", Style::default().add_modifier(Modifier::UNDERLINED))),
         Line::from("• Use UP/DOWN arrows to navigate between setting fields."),
         Line::from("• Type directly to edit max concurrency, timeout or retries per probe."),
+        Line::from(vec![
+            Span::raw("• PHP2Shell Audit (80/443): "),
+            if app.check_php {
+                Span::styled("ENABLED (Press 'P' to toggle)", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))
+            } else {
+                Span::styled("DISABLED (Press 'P' to toggle)", Style::default().fg(Color::DarkGray))
+            },
+        ]),
         Line::from("• Database Path: ") + Span::styled(&app.db_path, Style::default().fg(Color::Cyan)),
     ];
     let p_help = Paragraph::new(help_text)

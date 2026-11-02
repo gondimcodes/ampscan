@@ -24,6 +24,7 @@ pub async fn run_tui(
     pdf_output: String,
     pdf_client_name: Option<String>,
     pdf_recipient: Option<String>,
+    check_php: bool,
 ) -> anyhow::Result<()> {
     // Read database encryption key once at startup before removing it from env
     let db_key = crate::db::get_db_key().unwrap_or_default();
@@ -46,6 +47,7 @@ pub async fn run_tui(
         pdf_output,
         pdf_client_name,
         pdf_recipient,
+        check_php,
     );
 
     // Load prefixes and ports from DB on startup
@@ -53,7 +55,37 @@ pub async fn run_tui(
         if let Ok(prefixes) = crate::db::prefix_repo::get_enabled_prefixes(&mut conn) {
             app.prefixes = prefixes;
         }
-        if let Ok(ports) = crate::db::port_repo::get_enabled_ports(&mut conn) {
+        if let Ok(mut ports) = crate::db::port_repo::get_enabled_ports(&mut conn) {
+            if check_php {
+                if !ports.iter().any(|p| p.port == 80) {
+                    ports.push(crate::db::models::Port {
+                        id: 80,
+                        port: 80,
+                        protocol: "tcp".to_string(),
+                        name: "HTTP".to_string(),
+                        description: "HTTP - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                        probe_type: "php_http".to_string(),
+                        probe_payload: None,
+                        enabled: true,
+                        created_at: String::new(),
+                        updated_at: String::new(),
+                    });
+                }
+                if !ports.iter().any(|p| p.port == 443) {
+                    ports.push(crate::db::models::Port {
+                        id: 443,
+                        port: 443,
+                        protocol: "tcp".to_string(),
+                        name: "HTTPS".to_string(),
+                        description: "HTTPS - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                        probe_type: "php_https".to_string(),
+                        probe_payload: None,
+                        enabled: true,
+                        created_at: String::new(),
+                        updated_at: String::new(),
+                    });
+                }
+            }
             app.ports = ports;
         }
     }
@@ -84,6 +116,7 @@ pub async fn run_tui(
                                 let scan_id = uuid::Uuid::new_v4().to_string();
                                 let prefixes: Vec<String> = app.prefixes.iter().map(|p| p.prefix.clone()).collect();
                                 let mut report = crate::scanner::result::ScanReport::new(scan_id, prefixes);
+                                report.check_php = app.check_php;
                                 
                                 // Calculate total unique IPs tested from logs
                                 let mut unique_ips: Vec<_> = app.logs.iter().map(|l| l.ip).collect();
@@ -158,6 +191,7 @@ pub async fn run_tui(
                             let db_path = app.db_path.clone();
                             let db_key = app.db_key.clone();
                             let tx = tx.clone();
+                            let check_php = app.check_php;
                             let concurrency: usize = app.concurrency_input.parse().unwrap_or(256);
                             let timeout_secs: u64 = app.timeout_input.parse().unwrap_or(3);
                             let retries: usize = app.retries_input.parse().unwrap_or(2);
@@ -186,6 +220,7 @@ pub async fn run_tui(
                                     concurrency,
                                     timeout: Duration::from_secs(timeout_secs),
                                     retries,
+                                    check_php,
                                 };
 
                                 if let Err(e) = crate::scanner::scan_target_with_channel(&target_str, ports, &config, Some(tx.clone())).await {
@@ -205,6 +240,7 @@ pub async fn run_tui(
                         let db_path = app.db_path.clone();
                         let db_key = app.db_key.clone();
                         let tx = tx.clone();
+                        let check_php = app.check_php;
                         let concurrency: usize = app.concurrency_input.parse().unwrap_or(256);
                         let timeout_secs: u64 = app.timeout_input.parse().unwrap_or(3);
                         let retries: usize = app.retries_input.parse().unwrap_or(2);
@@ -246,6 +282,7 @@ pub async fn run_tui(
                                 concurrency,
                                 timeout: Duration::from_secs(timeout_secs),
                                 retries,
+                                check_php,
                             };
 
                             if let Err(e) = crate::scanner::run_scan_with_channel(ports, prefixes, &config, Some(tx.clone())).await {

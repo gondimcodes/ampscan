@@ -30,6 +30,7 @@ pub struct ScanConfig {
     pub concurrency: usize,
     pub timeout: Duration,
     pub retries: usize,
+    pub check_php: bool,
 }
 
 impl Default for ScanConfig {
@@ -38,6 +39,7 @@ impl Default for ScanConfig {
             concurrency: 256,
             timeout: Duration::from_secs(3),
             retries: 2,
+            check_php: false,
         }
     }
 }
@@ -58,6 +60,39 @@ pub async fn run_scan_with_channel(
     config: &ScanConfig,
     tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tui::app::TuiEvent>>,
 ) -> Result<ScanReport> {
+    // ── 0. Inject PHP2Shell audit ports (80 and 443) if enabled ───────────
+    let mut ports = ports;
+    if config.check_php {
+        if !ports.iter().any(|p| p.port == 80) {
+            ports.push(Port {
+                id: 80,
+                port: 80,
+                protocol: "tcp".to_string(),
+                name: "HTTP".to_string(),
+                description: "HTTP - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                probe_type: "php_http".to_string(),
+                probe_payload: None,
+                enabled: true,
+                created_at: String::new(),
+                updated_at: String::new(),
+            });
+        }
+        if !ports.iter().any(|p| p.port == 443) {
+            ports.push(Port {
+                id: 443,
+                port: 443,
+                protocol: "tcp".to_string(),
+                name: "HTTPS".to_string(),
+                description: "HTTPS - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)".to_string(),
+                probe_type: "php_https".to_string(),
+                probe_payload: None,
+                enabled: true,
+                created_at: String::new(),
+                updated_at: String::new(),
+            });
+        }
+    }
+
     // ── 1. Expand prefixes into individual IPs ────────────────────────────
     let prefix_strings: Vec<String> = prefixes.iter().map(|p| p.prefix.clone()).collect();
     let mut all_ips: Vec<IpAddr> = Vec::new();
@@ -120,6 +155,7 @@ pub async fn run_scan_with_channel(
     }
 
     let mut report = ScanReport::new(Uuid::new_v4().to_string(), prefix_strings);
+    report.check_php = config.check_php;
     report.total_ips = total_ips;
     report.total_probes = total_probes;
 

@@ -53,6 +53,7 @@ pub struct ScanReport {
     pub total_ips: usize,
     pub total_probes: usize,
     pub results: Vec<ProbeResult>,
+    pub check_php: bool,
 }
 
 impl ScanReport {
@@ -65,6 +66,7 @@ impl ScanReport {
             total_ips: 0,
             total_probes: 0,
             results: Vec::new(),
+            check_php: false,
         }
     }
 
@@ -123,5 +125,13 @@ impl ScanReport {
         let mut sorted: Vec<_> = map.into_iter().collect();
         sorted.sort_by(|a, b| b.1.cmp(&a.1));
         sorted
+    }
+
+    /// Check if report contains any findings from HTTP (80) or HTTPS (443) probes.
+    pub fn has_php_findings(&self) -> bool {
+        self.results.iter().any(|r| {
+            (r.port == 80 || r.port == 443)
+                && (r.status == PortStatus::Open || r.status == PortStatus::OpenProtected)
+        })
     }
 }
