@@ -54,6 +54,7 @@ pub struct ScanReport {
     pub total_probes: usize,
     pub results: Vec<ProbeResult>,
     pub check_php: bool,
+    pub http_host: Option<String>,
 }
 
 impl ScanReport {
@@ -67,6 +68,7 @@ impl ScanReport {
             total_probes: 0,
             results: Vec::new(),
             check_php: false,
+            http_host: None,
         }
     }
 

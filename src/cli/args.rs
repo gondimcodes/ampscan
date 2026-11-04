@@ -69,6 +69,9 @@ pub enum Commands {
         /// Audit HTTP (80) and HTTPS (443) for PHP2Shell (CVE-2026-109618 / CVE-2026-109619)
         #[arg(long)]
         check_php: bool,
+        /// Custom Host header and TLS SNI for --check-php probes (e.g. example.com)
+        #[arg(long)]
+        http_host: Option<String>,
     },
 }
 
@@ -183,6 +186,9 @@ pub enum ScanCommands {
         /// Audit HTTP (80) and HTTPS (443) for PHP2Shell (CVE-2026-109618 / CVE-2026-109619)
         #[arg(long)]
         check_php: bool,
+        /// Custom Host header and TLS SNI for --check-php probes (e.g. example.com)
+        #[arg(long)]
+        http_host: Option<String>,
     },
     /// Test a single IP against all enabled ports
     Single {
@@ -200,5 +206,8 @@ pub enum ScanCommands {
         /// Audit HTTP (80) and HTTPS (443) for PHP2Shell (CVE-2026-109618 / CVE-2026-109619)
         #[arg(long)]
         check_php: bool,
+        /// Custom Host header and TLS SNI for --check-php probes (e.g. example.com)
+        #[arg(long)]
+        http_host: Option<String>,
     },
 }

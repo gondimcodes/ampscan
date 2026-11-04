@@ -61,12 +61,24 @@ pub fn render_single_target(frame: &mut Frame, app: &App, area: Rect) {
     );
     frame.render_widget(p_input, chunks[0]);
 
-    let text = vec![
+    let mut text = vec![
         Line::from(Span::styled("Instructions:", Style::default().add_modifier(Modifier::UNDERLINED))),
         Line::from("• Type an IP address (e.g. 192.168.1.1) or CIDR subnet (e.g. 192.168.1.0/24) directly in this view."),
         Line::from("• Press [Enter] or [S] to launch an immediate scan against the specified target."),
         Line::from("• Switch to Dashboard [Tab] to see live progress and results."),
     ];
+
+    if let Some(ref h) = app.http_host {
+        text.push(Line::from(vec![
+            Span::raw("• Active Target Host (Vhost/SNI): "),
+            Span::styled(
+                h.as_str(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    }
     let p_info = Paragraph::new(text).block(
         Block::default()
             .borders(Borders::ALL)

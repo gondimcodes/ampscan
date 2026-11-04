@@ -84,6 +84,7 @@ pub struct App {
     pub pdf_client_name: Option<String>,
     pub pdf_recipient: Option<String>,
     pub check_php: bool,
+    pub http_host: Option<String>,
 
     // Status message for notification bar
     pub status_message: Option<String>,
@@ -102,6 +103,7 @@ impl App {
         pdf_client_name: Option<String>,
         pdf_recipient: Option<String>,
         check_php: bool,
+        http_host: Option<String>,
     ) -> Self {
         Self {
             active_tab: Tab::Dashboard,
@@ -129,6 +131,7 @@ impl App {
             pdf_client_name,
             pdf_recipient,
             check_php,
+            http_host,
             status_message: None,
         }
     }

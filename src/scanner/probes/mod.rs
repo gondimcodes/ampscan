@@ -22,16 +22,17 @@ pub async fn execute_probe(
     port_config: &Port,
     timeout: Duration,
     retries: usize,
+    http_host: Option<&str>,
 ) -> ProbeResult {
     let (status, latency_ms, custom_desc) = match port_config.protocol.as_str() {
         "tcp" => {
             if port_config.probe_type == "php_http" {
                 let (st, lat, desc) =
-                    http::execute_php_probe(ip, port_config.port, false, timeout).await;
+                    http::execute_php_probe(ip, port_config.port, false, timeout, http_host).await;
                 (st, lat, Some(desc))
             } else if port_config.probe_type == "php_https" {
                 let (st, lat, desc) =
-                    http::execute_php_probe(ip, port_config.port, true, timeout).await;
+                    http::execute_php_probe(ip, port_config.port, true, timeout, http_host).await;
                 (st, lat, Some(desc))
             } else {
                 let start = Instant::now();

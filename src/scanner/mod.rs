@@ -31,6 +31,7 @@ pub struct ScanConfig {
     pub timeout: Duration,
     pub retries: usize,
     pub check_php: bool,
+    pub http_host: Option<String>,
 }
 
 impl Default for ScanConfig {
@@ -40,6 +41,7 @@ impl Default for ScanConfig {
             timeout: Duration::from_secs(3),
             retries: 2,
             check_php: false,
+            http_host: None,
         }
     }
 }
@@ -158,6 +160,7 @@ pub async fn run_scan_with_channel(
 
     let mut report = ScanReport::new(Uuid::new_v4().to_string(), prefix_strings);
     report.check_php = config.check_php;
+    report.http_host = config.http_host.clone();
     report.total_ips = total_ips;
     report.total_probes = total_probes;
 
@@ -231,8 +234,11 @@ pub async fn run_scan_with_channel(
                 .map_err(|_| anyhow::anyhow!("Semaphore was closed unexpectedly during scan"))?;
 
             let port_config = Arc::clone(port_config);
+            let http_host = config.http_host.clone();
             join_set.spawn(async move {
-                let result = probes::execute_probe(ip, &port_config, timeout, retries).await;
+                let result =
+                    probes::execute_probe(ip, &port_config, timeout, retries, http_host.as_deref())
+                        .await;
                 drop(permit); // Release slot when probe completes
                 result
             });

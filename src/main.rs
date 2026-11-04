@@ -76,10 +76,14 @@ async fn main() -> Result<()> {
             client_name,
             recipient,
             check_php,
+            http_host,
         } => {
             let db_p = cli.db_path.as_deref().unwrap_or("");
             if db_p.is_empty() {
                 anyhow::bail!("O caminho do banco de dados (--db-path) é obrigatório para carregar a TUI com os alvos.");
+            }
+            if let Some(ref h) = http_host {
+                ampscan::scanner::probes::http::validate_http_host(h)?;
             }
             ampscan::tui::run_tui(
                 db_p.to_string(),
@@ -91,6 +95,7 @@ async fn main() -> Result<()> {
                 client_name.clone(),
                 recipient.clone(),
                 *check_php,
+                http_host.clone(),
             )
             .await
         }

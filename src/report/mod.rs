@@ -213,12 +213,17 @@ pub fn generate_pdf(
         false,
     );
     if report.check_php {
-        w.text(
-            "Audit Profile: Full Amplification + PHP2Shell (CVE-2026-109618 / CVE-2026-109619)",
-            BODY_SIZE,
-            BODY_LH,
-            true,
-        );
+        let profile_str = match &report.http_host {
+            Some(h) => format!(
+                "Audit Profile: Full Amplification + PHP2Shell (Target Vhost/SNI: {})",
+                h
+            ),
+            None => {
+                "Audit Profile: Full Amplification + PHP2Shell (CVE-2026-109618 / CVE-2026-109619)"
+                    .to_string()
+            }
+        };
+        w.text(&profile_str, BODY_SIZE, BODY_LH, true);
     }
 
     // ── Executive Summary ──────────────────────────────────────────

@@ -22,6 +22,7 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             client_name,
             recipient,
             check_php,
+            http_host,
         } => {
             let ports = port_repo::get_enabled_ports(db)?;
             if ports.is_empty() {
@@ -104,12 +105,17 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                         .bold()
                 );
             }
+            if let Some(ref h) = http_host {
+                crate::scanner::probes::http::validate_http_host(h)?;
+                println!("  Target Host (Vhost/SNI): {}", h.cyan().bold());
+            }
 
             let config = ScanConfig {
                 concurrency: *concurrency,
                 timeout: Duration::from_secs(*timeout),
                 retries: *retries,
                 check_php: *check_php,
+                http_host: http_host.clone(),
             };
 
             let report = scanner::run_scan(ports, prefixes, &config).await?;
@@ -203,10 +209,15 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             concurrency,
             retries,
             check_php,
+            http_host,
         } => {
             let ip_addr: IpAddr = ip
                 .parse()
                 .with_context(|| format!("Invalid IP address: {}", ip))?;
+
+            if let Some(ref h) = http_host {
+                crate::scanner::probes::http::validate_http_host(h)?;
+            }
 
             let ports = port_repo::get_enabled_ports(db)?;
             if ports.is_empty() {
@@ -219,19 +230,25 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             }
 
             println!(
-                "\n{} Testing {} ({} ports, Concurrency: {}, Retries: {})...\n",
+                "\n{} Testing {} ({} ports, Concurrency: {}, Retries: {})...",
                 "▶".cyan().bold(),
                 ip_addr,
                 ports.len(),
                 concurrency.to_string().bold(),
                 retries.to_string().bold()
             );
+            if let Some(ref h) = http_host {
+                println!("  Target Host (Vhost/SNI): {}\n", h.cyan().bold());
+            } else {
+                println!();
+            }
 
             let config = ScanConfig {
                 concurrency: *concurrency,
                 timeout: Duration::from_secs(*timeout),
                 retries: *retries,
                 check_php: *check_php,
+                http_host: http_host.clone(),
             };
 
             let results = scanner::scan_single_ip(ip_addr, ports, &config).await?;

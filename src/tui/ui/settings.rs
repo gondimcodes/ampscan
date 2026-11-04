@@ -90,6 +90,18 @@ pub fn render_settings(frame: &mut Frame, app: &App, area: Rect) {
                 )
             },
         ]),
+        Line::from(vec![
+            Span::raw("• Target Host (Vhost/SNI): "),
+            match &app.http_host {
+                Some(h) => Span::styled(
+                    h.as_str(),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                None => Span::styled("None (Direct IP)", Style::default().fg(Color::DarkGray)),
+            },
+        ]),
         Line::from("• Database Path: ")
             + Span::styled(&app.db_path, Style::default().fg(Color::Cyan)),
     ];

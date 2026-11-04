@@ -26,6 +26,7 @@ pub async fn run_tui(
     pdf_client_name: Option<String>,
     pdf_recipient: Option<String>,
     check_php: bool,
+    http_host: Option<String>,
 ) -> anyhow::Result<()> {
     // Read database encryption key once at startup before removing it from env
     let db_key = crate::db::get_db_key().unwrap_or_default();
@@ -49,6 +50,7 @@ pub async fn run_tui(
         pdf_client_name,
         pdf_recipient,
         check_php,
+        http_host,
     );
 
     // Load prefixes and ports from DB on startup
@@ -122,6 +124,7 @@ pub async fn run_tui(
                                 let mut report =
                                     crate::scanner::result::ScanReport::new(scan_id, prefixes);
                                 report.check_php = app.check_php;
+                                report.http_host = app.http_host.clone();
 
                                 // Calculate total unique IPs tested from logs
                                 let mut unique_ips: Vec<_> =
@@ -204,6 +207,7 @@ pub async fn run_tui(
                             let db_key = app.db_key.clone();
                             let tx = tx.clone();
                             let check_php = app.check_php;
+                            let http_host = app.http_host.clone();
                             let concurrency: usize = app.concurrency_input.parse().unwrap_or(256);
                             let timeout_secs: u64 = app.timeout_input.parse().unwrap_or(3);
                             let retries: usize = app.retries_input.parse().unwrap_or(2);
@@ -240,6 +244,7 @@ pub async fn run_tui(
                                     timeout: Duration::from_secs(timeout_secs),
                                     retries,
                                     check_php,
+                                    http_host,
                                 };
 
                                 if let Err(e) = crate::scanner::scan_target_with_channel(
@@ -267,6 +272,7 @@ pub async fn run_tui(
                         let db_key = app.db_key.clone();
                         let tx = tx.clone();
                         let check_php = app.check_php;
+                        let http_host = app.http_host.clone();
                         let concurrency: usize = app.concurrency_input.parse().unwrap_or(256);
                         let timeout_secs: u64 = app.timeout_input.parse().unwrap_or(3);
                         let retries: usize = app.retries_input.parse().unwrap_or(2);
@@ -318,6 +324,7 @@ pub async fn run_tui(
                                 timeout: Duration::from_secs(timeout_secs),
                                 retries,
                                 check_php,
+                                http_host,
                             };
 
                             if let Err(e) = crate::scanner::run_scan_with_channel(

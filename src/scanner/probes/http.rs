@@ -195,6 +195,36 @@ pub fn assess_php_version(version: &str) -> PhpAssessment {
     }
 }
 
+/// Validate an HTTP host string (domain or hostname with optional port)
+/// strictly preventing CRLF injection, control characters, and whitespace.
+pub fn validate_http_host(host: &str) -> anyhow::Result<()> {
+    if host.is_empty() {
+        anyhow::bail!("HTTP host cannot be empty");
+    }
+    if host.len() > 255 {
+        anyhow::bail!("HTTP host exceeds 255 characters");
+    }
+    for b in host.bytes() {
+        if b == b'\r' || b == b'\n' || b == b' ' || b.is_ascii_control() {
+            anyhow::bail!("HTTP host contains invalid character (CRLF or control character)");
+        }
+        // Allow ascii alphanumeric, '-', '.', ':', '_'
+        if !b.is_ascii_alphanumeric() && b != b'-' && b != b'.' && b != b':' && b != b'_' {
+            anyhow::bail!("HTTP host contains invalid character: '{}'", b as char);
+        }
+    }
+    Ok(())
+}
+
+/// Construct a non-intrusive HTTP HEAD request buffer with the specified Host header
+pub fn build_http_head_request(host: &str) -> String {
+    format!(
+        "HEAD / HTTP/1.1\r\nHost: {}\r\nUser-Agent: ampscan/{}\r\nAccept: */*\r\nConnection: close\r\n\r\n",
+        host,
+        env!("CARGO_PKG_VERSION")
+    )
+}
+
 /// Execute a two-phase non-intrusive HTTP/HTTPS probe:
 /// Phase 1: Fast TCP connect with capped timeout (max 1500ms).
 /// Phase 2: Send HEAD / request (plaintext or TLS) and parse headers.
@@ -203,6 +233,7 @@ pub async fn execute_php_probe(
     port: u16,
     is_tls: bool,
     timeout: Duration,
+    http_host: Option<&str>,
 ) -> (PortStatus, Option<u64>, String) {
     let start = Instant::now();
     let dest = SocketAddr::new(ip, port);
@@ -243,12 +274,12 @@ pub async fn execute_php_probe(
 
     let latency_ms = start.elapsed().as_millis() as u64;
 
-    // Send non-intrusive HEAD request
-    let req = format!(
-        "HEAD / HTTP/1.1\r\nHost: {}\r\nUser-Agent: ampscan/{}\r\nAccept: */*\r\nConnection: close\r\n\r\n",
-        ip,
-        env!("CARGO_PKG_VERSION")
-    );
+    // Send non-intrusive HEAD request using custom Host or direct IP
+    let host_header = match http_host {
+        Some(h) if !h.trim().is_empty() => h.trim().to_string(),
+        _ => ip.to_string(),
+    };
+    let req = build_http_head_request(&host_header);
 
     let read_timeout = Duration::from_millis(1500);
 
@@ -270,17 +301,35 @@ pub async fn execute_php_probe(
         String::from_utf8_lossy(&buf).to_string()
     } else {
         let connector = build_tls_connector();
-        let server_name = match ServerName::try_from(ip.to_string()) {
-            Ok(sn) => sn,
-            Err(_) => match ServerName::try_from("target".to_string()) {
-                Ok(sn) => sn,
-                Err(_) => {
-                    return (
-                        PortStatus::OpenProtected,
-                        Some(latency_ms),
-                        "HTTPS open (TLS hostname error)".to_string(),
-                    );
+        let server_name = match http_host {
+            Some(h) if !h.trim().is_empty() => {
+                let host_only = h.split(':').next().unwrap_or(h).trim();
+                match ServerName::try_from(host_only.to_string()) {
+                    Ok(sn) => sn,
+                    Err(_) => match ServerName::try_from("target".to_string()) {
+                        Ok(sn) => sn,
+                        Err(_) => {
+                            return (
+                                PortStatus::OpenProtected,
+                                Some(latency_ms),
+                                "HTTPS open (TLS hostname error)".to_string(),
+                            );
+                        }
+                    },
                 }
+            }
+            _ => match ServerName::try_from(ip.to_string()) {
+                Ok(sn) => sn,
+                Err(_) => match ServerName::try_from("target".to_string()) {
+                    Ok(sn) => sn,
+                    Err(_) => {
+                        return (
+                            PortStatus::OpenProtected,
+                            Some(latency_ms),
+                            "HTTPS open (TLS hostname error)".to_string(),
+                        );
+                    }
+                },
             },
         };
 
@@ -457,5 +506,29 @@ mod tests {
             parse_php_version_from_headers(headers_no_php),
             PhpAssessment::NoPhpHeader
         );
+    }
+
+    #[test]
+    fn test_validate_http_host() {
+        assert!(validate_http_host("exemplo.com.br").is_ok());
+        assert!(validate_http_host("sub.dominio.org").is_ok());
+        assert!(validate_http_host("localhost").is_ok());
+        assert!(validate_http_host("cdn.site.com:8443").is_ok());
+        assert!(validate_http_host("192.168.1.1").is_ok());
+
+        // CRLF injection and invalid characters
+        assert!(validate_http_host("site.com\r\nX-Injected: 1").is_err());
+        assert!(validate_http_host("site.com\n").is_err());
+        assert!(validate_http_host("site com").is_err());
+        assert!(validate_http_host("").is_err());
+        assert!(validate_http_host("   ").is_err());
+        assert!(validate_http_host("bad*char.com").is_err());
+    }
+
+    #[test]
+    fn test_build_http_head_request() {
+        let req = build_http_head_request("meusite.com.br");
+        assert!(req.starts_with("HEAD / HTTP/1.1\r\nHost: meusite.com.br\r\n"));
+        assert!(req.ends_with("\r\n\r\n"));
     }
 }
