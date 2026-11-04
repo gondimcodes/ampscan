@@ -58,40 +58,9 @@ pub async fn run_tui(
         if let Ok(prefixes) = crate::db::prefix_repo::get_enabled_prefixes(&conn) {
             app.prefixes = prefixes;
         }
-        if let Ok(mut ports) = crate::db::port_repo::get_enabled_ports(&conn) {
-            if check_php {
-                if !ports.iter().any(|p| p.port == 80) {
-                    ports.push(crate::db::models::Port {
-                        id: 80,
-                        port: 80,
-                        protocol: "tcp".to_string(),
-                        name: "HTTP".to_string(),
-                        description: "HTTP - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)"
-                            .to_string(),
-                        probe_type: "php_http".to_string(),
-                        probe_payload: None,
-                        enabled: true,
-                        created_at: String::new(),
-                        updated_at: String::new(),
-                    });
-                }
-                if !ports.iter().any(|p| p.port == 443) {
-                    ports.push(crate::db::models::Port {
-                        id: 443,
-                        port: 443,
-                        protocol: "tcp".to_string(),
-                        name: "HTTPS".to_string(),
-                        description: "HTTPS - PHP2Shell check (CVE-2026-109618 / CVE-2026-109619)"
-                            .to_string(),
-                        probe_type: "php_https".to_string(),
-                        probe_payload: None,
-                        enabled: true,
-                        created_at: String::new(),
-                        updated_at: String::new(),
-                    });
-                }
-            }
+        if let Ok(ports) = crate::db::port_repo::get_enabled_ports(&conn) {
             app.ports = ports;
+            app.sync_php_ports();
         }
     }
 

@@ -46,7 +46,7 @@ pub fn handle_events(app: &mut App) -> io::Result<UserAction> {
                     match key.code {
                         KeyCode::Char(c) => {
                             if c == 'p' || c == 'P' {
-                                app.check_php = !app.check_php;
+                                app.toggle_check_php();
                                 app.status_message = Some(format!(
                                     "PHP2Shell check: {}",
                                     if app.check_php {
