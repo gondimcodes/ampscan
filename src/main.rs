@@ -63,10 +63,7 @@ async fn main() -> Result<()> {
             let db = open_and_auth(&cli)?;
             cmd_user(&db, cmd)
         }
-        Commands::Scan(cmd) => {
-            let db = open_and_auth(&cli)?;
-            cmd_scan(&db, cmd).await
-        }
+        Commands::Scan(cmd) => cmd_scan(&cli, cmd).await,
         Commands::Tui {
             concurrency,
             timeout,

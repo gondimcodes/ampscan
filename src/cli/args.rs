@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
     version
 )]
 pub struct Cli {
-    /// Database file path (obrigatorio)
+    /// Database file path (required for database management and scans without --prefix)
     #[arg(long, global = true, env = "AMPSCAN_DB_PATH")]
     pub db_path: Option<String>,
 

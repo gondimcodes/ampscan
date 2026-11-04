@@ -209,3 +209,45 @@ pub const DEFAULT_PORTS: &[DefaultPortDef] = &[
         payload: &[],
     },
 ];
+
+use crate::db::models::Port;
+
+/// Convert static DEFAULT_PORTS into a Vec of Port models for zero-DB execution
+pub fn get_default_ports() -> Vec<Port> {
+    DEFAULT_PORTS
+        .iter()
+        .enumerate()
+        .map(|(i, def)| Port {
+            id: (i + 1) as i64,
+            port: def.port,
+            protocol: def.protocol.to_string(),
+            name: def.name.to_string(),
+            description: def.description.to_string(),
+            probe_type: def.probe_type.to_string(),
+            probe_payload: if def.payload.is_empty() {
+                None
+            } else {
+                Some(def.payload.to_vec())
+            },
+            enabled: true,
+            created_at: String::new(),
+            updated_at: String::new(),
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_default_ports_completeness() {
+        let ports = get_default_ports();
+        assert_eq!(ports.len(), 23);
+        for p in &ports {
+            assert!(p.enabled);
+            assert!(!p.name.is_empty());
+            assert!(p.protocol == "udp" || p.protocol == "tcp");
+        }
+    }
+}

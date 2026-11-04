@@ -1,6 +1,7 @@
 //! CLI scan command implementation and output formatting
-use crate::cli::args::ScanCommands;
-use crate::db::{port_repo, prefix_repo, DbConn};
+use crate::cli::args::{Cli, ScanCommands};
+use crate::cli::auth_helper::open_and_auth;
+use crate::db::{default_ports, port_repo, prefix_repo};
 use crate::report;
 use crate::scanner::{self, ScanConfig};
 use anyhow::{Context, Result};
@@ -10,7 +11,7 @@ use ipnet::IpNet;
 use std::net::IpAddr;
 use std::time::Duration;
 
-pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
+pub async fn cmd_scan(cli: &Cli, cmd: &ScanCommands) -> Result<()> {
     match cmd {
         ScanCommands::Run {
             concurrency,
@@ -24,63 +25,80 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
             check_php,
             http_host,
         } => {
-            let ports = port_repo::get_enabled_ports(db)?;
-            if ports.is_empty() {
-                anyhow::bail!("No enabled ports. Use 'ampscan port list' to view ports.");
-            }
+            let (ports, prefixes) = if let Some(p) = prefix {
+                // Validate the manually provided --prefix early, before
+                // any network activity, to give immediate feedback.
+                let net: IpNet = p
+                    .parse()
+                    .with_context(|| format!("Invalid CIDR prefix: '{}'", p))?;
 
-            let prefixes = match prefix {
-                Some(p) => {
-                    // Validate the manually provided --prefix early, before
-                    // any network activity, to give immediate feedback.
-                    let net: IpNet = p
-                        .parse()
-                        .with_context(|| format!("Invalid CIDR prefix: '{}'", p))?;
-
-                    // Enforce the same size limits as the DB-registered prefixes
-                    match &net {
-                        IpNet::V4(net4) => {
-                            let start: u32 = net4.network().into();
-                            let end: u32 = net4.broadcast().into();
-                            let count = (end as u64 - start as u64 + 1) as usize;
-                            if count > 65_536 {
-                                anyhow::bail!(
-                                    "Prefix {} is too large ({} hosts). Maximum is 65536 (/16).",
-                                    p,
-                                    count
-                                );
-                            }
-                        }
-                        IpNet::V6(net6) => {
-                            if net6.prefix_len() < 112 {
-                                anyhow::bail!(
-                                    "IPv6 prefix /{} is too large. Maximum allowed is /112.",
-                                    net6.prefix_len()
-                                );
-                            }
+                // Enforce the same size limits as the DB-registered prefixes
+                match &net {
+                    IpNet::V4(net4) => {
+                        let start: u32 = net4.network().into();
+                        let end: u32 = net4.broadcast().into();
+                        let count = (end as u64 - start as u64 + 1) as usize;
+                        if count > 65_536 {
+                            anyhow::bail!(
+                                "Prefix {} is too large ({} hosts). Maximum is 65536 (/16).",
+                                p,
+                                count
+                            );
                         }
                     }
-
-                    let ip_version: u8 = if net.addr().is_ipv4() { 4 } else { 6 };
-                    vec![crate::db::models::Prefix {
-                        id: 0,
-                        prefix: p.clone(),
-                        description: "Manual prefix".to_string(),
-                        ip_version,
-                        enabled: true,
-                        created_at: "".to_string(),
-                        updated_at: "".to_string(),
-                    }]
-                }
-                None => {
-                    let list = prefix_repo::get_enabled_prefixes(db)?;
-                    if list.is_empty() {
-                        anyhow::bail!(
-                            "No enabled prefixes in the database. Register a prefix or use --prefix."
-                        );
+                    IpNet::V6(net6) => {
+                        if net6.prefix_len() < 112 {
+                            anyhow::bail!(
+                                "IPv6 prefix /{} is too large. Maximum allowed is /112.",
+                                net6.prefix_len()
+                            );
+                        }
                     }
-                    list
                 }
+
+                let ip_version: u8 = if net.addr().is_ipv4() { 4 } else { 6 };
+                let manual_prefix = vec![crate::db::models::Prefix {
+                    id: 0,
+                    prefix: p.clone(),
+                    description: "Manual prefix".to_string(),
+                    ip_version,
+                    enabled: true,
+                    created_at: "".to_string(),
+                    updated_at: "".to_string(),
+                }];
+
+                let ports = if cli.db_path.is_some() {
+                    let db = open_and_auth(cli)?;
+                    let p = port_repo::get_enabled_ports(&db)?;
+                    if p.is_empty() {
+                        anyhow::bail!("No enabled ports. Use 'ampscan port list' to view ports.");
+                    }
+                    p
+                } else {
+                    default_ports::get_default_ports()
+                };
+
+                (ports, manual_prefix)
+            } else {
+                // No manual prefix: DB is required to load registered prefixes
+                if cli.db_path.is_none() {
+                    anyhow::bail!(
+                        "O parâmetro --db-path é obrigatório para escanear os prefixos cadastrados no banco. \
+                         Alternativamente, informe um prefixo manual com '--prefix <CIDR>' ou use 'ampscan scan single <IP>'."
+                    );
+                }
+                let db = open_and_auth(cli)?;
+                let ports = port_repo::get_enabled_ports(&db)?;
+                if ports.is_empty() {
+                    anyhow::bail!("No enabled ports. Use 'ampscan port list' to view ports.");
+                }
+                let list = prefix_repo::get_enabled_prefixes(&db)?;
+                if list.is_empty() {
+                    anyhow::bail!(
+                        "No enabled prefixes in the database. Register a prefix or use --prefix."
+                    );
+                }
+                (ports, list)
             };
 
             // Attempt to raise file descriptor limit for Unix
@@ -219,10 +237,16 @@ pub async fn cmd_scan(db: &DbConn, cmd: &ScanCommands) -> Result<()> {
                 crate::scanner::probes::http::validate_http_host(h)?;
             }
 
-            let ports = port_repo::get_enabled_ports(db)?;
-            if ports.is_empty() {
-                anyhow::bail!("No enabled ports to test.");
-            }
+            let ports = if cli.db_path.is_some() {
+                let db = open_and_auth(cli)?;
+                let p = port_repo::get_enabled_ports(&db)?;
+                if p.is_empty() {
+                    anyhow::bail!("No enabled ports to test in database.");
+                }
+                p
+            } else {
+                default_ports::get_default_ports()
+            };
 
             // Attempt to raise file descriptor limit for Unix
             if let Err(e) = crate::sys_limits::try_raise_fd_limit(*concurrency) {
