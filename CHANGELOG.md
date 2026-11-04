@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-11-03
+
+### Added
+- **Custom Virtual Host & TLS SNI Routing (`--http-host`)**:
+  - Added `--http-host <HOST>` parameter to `scan single`, `scan run`, and `tui` commands.
+  - Injects the specified domain into the `Host: <HOST>` HTTP header and into the TLS `Client Hello` Server Name Indication (SNI) extension via `tokio-rustls`.
+  - Enables non-intrusive auditing of backends protected by CDNs (Cloudflare, Fastly, Akamai) or shared reverse proxies, bypassing default vhost fallback (HTTP 400/403).
+  - RFC 6066 compliance: automatically strips port numbers from the SNI extension if supplied (e.g., `domain.com:8443` -> SNI `domain.com`).
+  - Integrated into PDF executive reports, CLI summary displays, and TUI Settings and Single Target tabs.
+
+### Changed
+- **Zero-DB Mode for Ad-hoc Inspection (`scan single` and `scan run --prefix`)**:
+  - Removed mandatory `--db-path`, `AMPSCAN_DB_KEY`, and user authentication for ad-hoc diagnostics on single target IPs (`scan single`) or manual subnets (`scan run --prefix`).
+  - Loads the built-in 23 DDoS amplification signatures (`DEFAULT_PORTS`) directly in memory with zero disk I/O.
+  - Automatically injects ports `80/tcp` (HTTP) and `443/tcp` (HTTPS) when `--check-php` is enabled.
+  - Preserves optional `--db-path` usage to test custom/database-enabled ports when explicitly provided.
+
+### Security
+- **Strict CRLF / Header Injection Defense**:
+  - Added `validate_http_host` to enforce RFC 1123/3986 compliance and reject any `\r`, `\n`, control characters, spaces, or malformed characters before socket creation.
+
 ## [1.5.0] - 2026-11-01
 
 ### Added

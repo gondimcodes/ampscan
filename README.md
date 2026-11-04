@@ -188,34 +188,47 @@ Defines the targets for batch scanning (accepts IPv4 and IPv6 ranges):
 
 ### Running Scans (`scan`)
 
-AmpScan has two execution modes:
+AmpScan offers flexible scanning modes for both network-wide audits and ad-hoc single-target investigations:
 
 #### 1. Batch Scan Mode (`scan run`)
-Fetches all prefixes and ports marked as active (`enabled`) in the database and performs parallel testing directly on all hosts.
+Tests all prefixes and ports configured in the database, or scans a manually specified CIDR prefix.
 
 **Supported parameters:**
 *   `--concurrency <N>`: Number of probes sent simultaneously (default: `256`).
 *   `--timeout <S>`: Timeout for each probe's response in seconds (default: `3`).
+*   `--retries <N>`: Number of retries for UDP probes (default: `2`).
 *   `--output <PATH>`: Name of the PDF file to be generated (default: `ampscan_report.pdf`).
-*   `--prefix <CIDR>`: Manual network prefix to scan (e.g.: `192.168.1.0/24`). **Ignores database-configured prefixes and skips PDF report generation**.
+*   `--prefix <CIDR>`: Manual network prefix to scan (e.g.: `192.168.1.0/24`). **Runs in Zero-DB mode if `--db-path` is omitted** (uses the built-in 23 amplification ports directly).
+*   `--check-php`: Injects passive auditing for `80/tcp` (HTTP) and `443/tcp` (HTTPS) to detect critical PHP2Shell vulnerabilities (CVE-2026-109618 / CVE-2026-109619).
+*   `--http-host <HOST>`: Specifies a custom HTTP `Host` header and TLS Server Name Indication (SNI) for `--check-php` probes, bypassing CDN/WAF default vhosts.
 *   `--pdf`: Enable automatic PDF report generation.
 
-Robust execution example:
+Database batch scan example:
 ```bash
-ampscan --db-path ampscan.db scan run --concurrency 500 --timeout 2 --pdf --output scan_june.pdf
+ampscan --db-path ampscan.db scan run --concurrency 500 --timeout 2 --pdf --output audit_report.pdf
 ```
 ![Scan Run CLI Output](ampscan_report_cli.png)
 
-Example with manual prefix:
+Manual CIDR prefix scan (Zero-DB mode, no database or login required):
 ```bash
-ampscan --db-path ampscan.db scan run --prefix "10.0.0.0/29"
+ampscan scan run --prefix "10.0.0.0/29" --check-php
 ```
 
 #### 2. Single IP Mode (`scan single`)
-Tests all active ports against a single destination IP, printing real-time responses and timings to the console:
+Tests all amplification ports against a single target IP with live terminal feedback. **Runs in Zero-DB mode by default** — no database file, master key, or credentials needed:
 
 ```bash
-ampscan --db-path ampscan.db scan single 1.1.1.1 --timeout 2
+# 1. Standard single IP scan across all 23 DDoS amplification ports:
+ampscan scan single 1.1.1.1 --timeout 2
+
+# 2. Single IP scan with PHP2Shell audit (23 DDoS ports + 80/tcp + 443/tcp):
+ampscan scan single 198.51.100.10 --check-php
+
+# 3. Single IP scan behind CDN/WAF with custom Host header and TLS SNI:
+ampscan scan single 104.21.76.221 --check-php --http-host www.example.com.br
+
+# 4. Optional: Single IP scan using customized ports from an encrypted database:
+ampscan --db-path ampscan.db scan single 1.1.1.1
 ```
 
 ---
