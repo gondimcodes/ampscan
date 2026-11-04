@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-11-04
+
+### Fixed
+- **Reactive Port Database & Statistics Synchronization in TUI**:
+  - Resolved state desynchronization bug where dynamically toggling PHP2Shell (`P` key in Settings tab) did not update the registered signatures in the Port Database tab or the side-by-side Port Statistics panel.
+  - Added `sync_php_ports()` and `toggle_check_php()` to `App` to dynamically insert or remove `80/tcp` (`php_http`) and `443/tcp` (`php_https`) in real time, keeping ports sorted by port number.
+  - Added dedicated regression unit test `test_toggle_check_php_updates_port_database_dynamically`.
+
 ## [1.5.1] - 2026-11-03
 
 ### Added
