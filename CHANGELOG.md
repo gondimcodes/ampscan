@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unified Host Reachability & Alive-IP Closure (`CLI` + `TUI`)**:
   - Added `ensure_root_privileges()` in `src/sys_limits.rs` / `src/main.rs` to abort immediately with a clear error if executed without root privileges (`euid != 0` on Unix).
   - `apply_alive_ip_closure` now recognizes `PortStatus::Closed` (TCP RST / `ConnectionRefused`) as proof that the host is UP, closing silent UDP ports on that host instead of leaving them `Inconclusive`.
-  - Added post-scan **ICMP Echo (IPv4 & IPv6)** reachability fallback (`src/scanner/probes/icmp.rs`, `SOCK_DGRAM` async with `SOCK_RAW` fallback) exclusively for hosts with 100% `Inconclusive` port results; hosts responding to ICMP Echo are marked `Closed` across both CLI and TUI (`TuiEvent::HostsAlive`). Hosts with zero port and zero ICMP responses remain `Inconclusive`.
+  - Added streaming **per-IP ICMP Echo (IPv4 & IPv6)** reachability fallback (`src/scanner/probes/icmp.rs`, `SOCK_DGRAM` async with `SOCK_RAW` fallback) triggered immediately as each silent IP finishes its port probes—running in parallel with the rest of the scan instead of stalling at 100%; hosts responding to ICMP Echo are marked `Closed` across both CLI and TUI (`TuiEvent::HostsAlive`). Hosts with zero port and zero ICMP responses remain `Inconclusive`.
 
 ### Fixed
 - **mDNS Validator Hardening (`5353/udp`)**:

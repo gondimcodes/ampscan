@@ -177,6 +177,11 @@ pub async fn run_scan_with_channel(
     let retries = config.retries;
 
     let mut join_set = tokio::task::JoinSet::<ProbeResult>::new();
+    let mut icmp_join_set = tokio::task::JoinSet::<(IpAddr, bool)>::new();
+    let mut ip_state: std::collections::HashMap<IpAddr, (usize, bool)> =
+        std::collections::HashMap::new();
+    let mut icmp_alive: std::collections::HashSet<IpAddr> = std::collections::HashSet::new();
+    let port_count = ports.len();
     let mut done: usize = 0;
     let mut fd_exhaustion_detected = false;
     let mut fd_error_msg = String::new();
@@ -205,6 +210,7 @@ pub async fn run_scan_with_channel(
                                 fd_exhaustion_detected = true;
                                 fd_error_msg = e.clone();
                                 join_set.abort_all();
+                                icmp_join_set.abort_all();
                                 break 'outer;
                             }
                         }
@@ -212,6 +218,18 @@ pub async fn run_scan_with_channel(
                             let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(
                                 probe_result.clone(),
                             ));
+                        }
+                        if let Some(silent_ip) =
+                            record_probe_for_ip(&mut ip_state, port_count, &probe_result)
+                        {
+                            if let Ok(permit) = Arc::clone(&semaphore).acquire_owned().await {
+                                icmp_join_set.spawn(async move {
+                                    let alive =
+                                        probes::icmp::probe_icmp_echo(silent_ip, timeout).await;
+                                    drop(permit);
+                                    (silent_ip, alive)
+                                });
+                            }
                         }
                         report.results.push(probe_result);
                         done += 1;
@@ -223,6 +241,9 @@ pub async fn run_scan_with_channel(
                     _ => break, // No more completed tasks right now
                 }
             }
+
+            // Drain completed ICMP probes continuously in parallel
+            drain_completed_icmp(&mut icmp_join_set, &mut icmp_alive, tx.as_ref());
 
             // Block (cooperatively) until a concurrency slot is available.
             // Tokio schedules other tasks while we wait, including running probes.
@@ -255,6 +276,7 @@ pub async fn run_scan_with_channel(
                         fd_exhaustion_detected = true;
                         fd_error_msg = e.clone();
                         join_set.abort_all();
+                        icmp_join_set.abort_all();
                         continue;
                     }
                 }
@@ -262,6 +284,17 @@ pub async fn run_scan_with_channel(
                     let _ = sender.send(crate::tui::app::TuiEvent::ProbeCompleted(
                         probe_result.clone(),
                     ));
+                }
+                if let Some(silent_ip) =
+                    record_probe_for_ip(&mut ip_state, port_count, &probe_result)
+                {
+                    if let Ok(permit) = Arc::clone(&semaphore).acquire_owned().await {
+                        icmp_join_set.spawn(async move {
+                            let alive = probes::icmp::probe_icmp_echo(silent_ip, timeout).await;
+                            drop(permit);
+                            (silent_ip, alive)
+                        });
+                    }
                 }
                 report.results.push(probe_result);
                 done += 1;
@@ -271,6 +304,17 @@ pub async fn run_scan_with_channel(
                 eprintln!("\nTask error: {}", e);
             }
             _ => {}
+        }
+    }
+
+    if !fd_exhaustion_detected {
+        while let Some(res) = icmp_join_set.join_next().await {
+            if let Ok((ip, true)) = res {
+                icmp_alive.insert(ip);
+                if let Some(ref sender) = tx {
+                    let _ = sender.send(crate::tui::app::TuiEvent::HostsAlive(vec![ip]));
+                }
+            }
         }
     }
     eprintln!(); // Newline after progress bar
@@ -285,31 +329,7 @@ pub async fn run_scan_with_channel(
         anyhow::bail!("Scan aborted: OS limit reached (Too many open files).");
     }
 
-    // ── 5. Post-process: ICMP fallback for silent hosts & alive-IP closure ─
-    let known_alive = collect_alive_ips(&report.results);
-    let mut silent_ips: Vec<IpAddr> = report
-        .results
-        .iter()
-        .filter(|r| r.status == PortStatus::Inconclusive && !known_alive.contains(&r.ip))
-        .map(|r| r.ip)
-        .collect();
-    silent_ips.sort_unstable();
-    silent_ips.dedup();
-
-    let icmp_alive = if silent_ips.is_empty() {
-        std::collections::HashSet::new()
-    } else {
-        probe_icmp_alive_batch(&silent_ips, timeout, &semaphore).await
-    };
-
-    if !icmp_alive.is_empty() {
-        if let Some(ref sender) = tx {
-            let _ = sender.send(crate::tui::app::TuiEvent::HostsAlive(
-                icmp_alive.iter().copied().collect(),
-            ));
-        }
-    }
-
+    // ── 5. Post-process: alive-IP closure (port responses + per-IP ICMP) ──
     apply_alive_ip_closure_with_extra(&mut report.results, &icmp_alive);
 
     report.finalize();
@@ -354,44 +374,59 @@ fn draw_progress(done: usize, total: usize, is_tui: bool) {
     let _ = std::io::stderr().flush();
 }
 
+fn is_alive_status(status: &PortStatus) -> bool {
+    matches!(
+        status,
+        PortStatus::Open | PortStatus::OpenProtected | PortStatus::OpenNoPhp | PortStatus::Closed
+    )
+}
+
 fn collect_alive_ips(results: &[ProbeResult]) -> std::collections::HashSet<IpAddr> {
     let mut alive_ips = std::collections::HashSet::new();
     for r in results.iter() {
-        if matches!(
-            r.status,
-            PortStatus::Open
-                | PortStatus::OpenProtected
-                | PortStatus::OpenNoPhp
-                | PortStatus::Closed
-        ) {
+        if is_alive_status(&r.status) {
             alive_ips.insert(r.ip);
         }
     }
     alive_ips
 }
 
-async fn probe_icmp_alive_batch(
-    ips: &[IpAddr],
-    timeout: Duration,
-    semaphore: &Arc<Semaphore>,
-) -> std::collections::HashSet<IpAddr> {
-    let mut join_set = tokio::task::JoinSet::new();
-    for &ip in ips {
-        if let Ok(permit) = Arc::clone(semaphore).acquire_owned().await {
-            join_set.spawn(async move {
-                let alive = probes::icmp::probe_icmp_echo(ip, timeout).await;
-                drop(permit);
-                (ip, alive)
-            });
+/// Track per-IP probe completion; returns `Some(ip)` when the last port for `ip`
+/// finishes and none of its ports responded.
+fn record_probe_for_ip(
+    ip_state: &mut std::collections::HashMap<IpAddr, (usize, bool)>,
+    port_count: usize,
+    probe_result: &ProbeResult,
+) -> Option<IpAddr> {
+    let entry = ip_state
+        .entry(probe_result.ip)
+        .or_insert((port_count, false));
+    entry.0 = entry.0.saturating_sub(1);
+    if is_alive_status(&probe_result.status) {
+        entry.1 = true;
+    }
+    if entry.0 == 0 {
+        let (_, alive) = ip_state.remove(&probe_result.ip).unwrap_or((0, false));
+        if !alive {
+            return Some(probe_result.ip);
         }
     }
-    let mut alive_ips = std::collections::HashSet::new();
-    while let Some(res) = join_set.join_next().await {
+    None
+}
+
+fn drain_completed_icmp(
+    icmp_join_set: &mut tokio::task::JoinSet<(IpAddr, bool)>,
+    icmp_alive: &mut std::collections::HashSet<IpAddr>,
+    tx: Option<&tokio::sync::mpsc::UnboundedSender<crate::tui::app::TuiEvent>>,
+) {
+    while let Some(res) = icmp_join_set.try_join_next() {
         if let Ok((ip, true)) = res {
-            alive_ips.insert(ip);
+            icmp_alive.insert(ip);
+            if let Some(sender) = tx {
+                let _ = sender.send(crate::tui::app::TuiEvent::HostsAlive(vec![ip]));
+            }
         }
     }
-    alive_ips
 }
 
 /// If a host responded on any port (`Open`, `OpenProtected`, `OpenNoPhp`, or `Closed` via TCP RST),
@@ -602,5 +637,59 @@ mod tests {
         assert_eq!(results[2].status, PortStatus::Closed);
         // Host with zero port/ICMP responses -> remains Inconclusive
         assert_eq!(results[3].status, PortStatus::Inconclusive);
+    }
+
+    #[test]
+    fn test_record_probe_for_ip_triggers_icmp_only_for_silent_hosts() {
+        let silent_ip: IpAddr = "192.0.2.40".parse().unwrap();
+        let active_ip: IpAddr = "192.0.2.50".parse().unwrap();
+
+        let make_res = |ip: IpAddr, port: u16, status: PortStatus| ProbeResult {
+            ip,
+            port,
+            protocol: "udp".to_string(),
+            service_name: "SVC".to_string(),
+            description: String::new(),
+            status,
+            response_time_ms: None,
+            timestamp: chrono::Utc::now(),
+        };
+
+        let mut ip_state = std::collections::HashMap::new();
+        assert_eq!(
+            record_probe_for_ip(
+                &mut ip_state,
+                2,
+                &make_res(silent_ip, 53, PortStatus::Inconclusive)
+            ),
+            None
+        );
+        assert_eq!(
+            record_probe_for_ip(
+                &mut ip_state,
+                2,
+                &make_res(silent_ip, 123, PortStatus::Inconclusive)
+            ),
+            Some(silent_ip)
+        );
+        assert!(!ip_state.contains_key(&silent_ip));
+
+        assert_eq!(
+            record_probe_for_ip(
+                &mut ip_state,
+                2,
+                &make_res(active_ip, 4145, PortStatus::Closed)
+            ),
+            None
+        );
+        assert_eq!(
+            record_probe_for_ip(
+                &mut ip_state,
+                2,
+                &make_res(active_ip, 53, PortStatus::Inconclusive)
+            ),
+            None
+        );
+        assert!(!ip_state.contains_key(&active_ip));
     }
 }
