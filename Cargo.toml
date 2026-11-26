@@ -62,11 +62,8 @@ libc = "0.2"
 # Secure memory zeroization (clears sensitive data from heap after use)
 zeroize = { version = "1", features = ["derive"] }
 
-[target.'cfg(windows)'.dependencies]
-rusqlite = { version = "0.43", features = ["bundled-sqlcipher-vendored-openssl"] }
-
 [target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
 rusqlite = { version = "0.43", features = ["bundled-sqlcipher-vendored-openssl"] }
 
-[target.'cfg(all(not(windows), not(all(target_os = "linux", target_arch = "aarch64"))))'.dependencies]
+[target.'cfg(not(all(target_os = "linux", target_arch = "aarch64")))'.dependencies]
 rusqlite = { version = "0.43", features = ["bundled-sqlcipher"] }

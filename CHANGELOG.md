@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `apply_alive_ip_closure` now recognizes `PortStatus::Closed` (TCP RST / `ConnectionRefused`) as proof that the host is UP, closing silent UDP ports on that host instead of leaving them `Inconclusive`.
   - Added streaming **per-IP ICMP Echo (IPv4 & IPv6)** reachability fallback (`src/scanner/probes/icmp.rs`, `SOCK_DGRAM` async with `SOCK_RAW` fallback) triggered immediately as each silent IP finishes its port probes—running in parallel with the rest of the scan instead of stalling at 100%; hosts responding to ICMP Echo are marked `Closed` across both CLI and TUI (`TuiEvent::HostsAlive`). Hosts with zero port and zero ICMP responses remain `Inconclusive`.
 
+### Removed
+- **Windows Target Support**:
+  - Removed `x86_64-pc-windows-msvc` from `.github/workflows/release.yml` and Windows-specific `rusqlite` target dependency from `Cargo.toml`. AmpScan now targets Unix/POSIX platforms (Linux x86_64/ARM64, macOS x86_64/ARM64, FreeBSD x86_64) with root enforcement and full ICMP reachability support.
+
 ### Fixed
 - **mDNS Validator Hardening (`5353/udp`)**:
   - Updated `validate_udp_response("mdns", ...)` in `src/scanner/probes/validate.rs` to require `QR = 1`, `Opcode = 0`, `RCODE = 0` (`NoError`), and at least one response record (`ANCOUNT + NSCOUNT + ARCOUNT > 0`) while keeping `TXID` unlocked per RFC 6762 §18.1.
