@@ -285,8 +285,32 @@ pub async fn run_scan_with_channel(
         anyhow::bail!("Scan aborted: OS limit reached (Too many open files).");
     }
 
-    // ── 5. Post-process: infer closed ports on known-alive hosts ──────────
-    apply_alive_ip_closure(&mut report.results);
+    // ── 5. Post-process: ICMP fallback for silent hosts & alive-IP closure ─
+    let known_alive = collect_alive_ips(&report.results);
+    let mut silent_ips: Vec<IpAddr> = report
+        .results
+        .iter()
+        .filter(|r| r.status == PortStatus::Inconclusive && !known_alive.contains(&r.ip))
+        .map(|r| r.ip)
+        .collect();
+    silent_ips.sort_unstable();
+    silent_ips.dedup();
+
+    let icmp_alive = if silent_ips.is_empty() {
+        std::collections::HashSet::new()
+    } else {
+        probe_icmp_alive_batch(&silent_ips, timeout, &semaphore).await
+    };
+
+    if !icmp_alive.is_empty() {
+        if let Some(ref sender) = tx {
+            let _ = sender.send(crate::tui::app::TuiEvent::HostsAlive(
+                icmp_alive.iter().copied().collect(),
+            ));
+        }
+    }
+
+    apply_alive_ip_closure_with_extra(&mut report.results, &icmp_alive);
 
     report.finalize();
 
@@ -330,18 +354,60 @@ fn draw_progress(done: usize, total: usize, is_tui: bool) {
     let _ = std::io::stderr().flush();
 }
 
-/// If a host responded on any port (`Open`, `OpenProtected`, or `OpenNoPhp`),
-/// mark all remaining `Inconclusive` ports on that host as `Closed`.
-pub fn apply_alive_ip_closure(results: &mut [ProbeResult]) {
+fn collect_alive_ips(results: &[ProbeResult]) -> std::collections::HashSet<IpAddr> {
     let mut alive_ips = std::collections::HashSet::new();
     for r in results.iter() {
         if matches!(
             r.status,
-            PortStatus::Open | PortStatus::OpenProtected | PortStatus::OpenNoPhp
+            PortStatus::Open
+                | PortStatus::OpenProtected
+                | PortStatus::OpenNoPhp
+                | PortStatus::Closed
         ) {
             alive_ips.insert(r.ip);
         }
     }
+    alive_ips
+}
+
+async fn probe_icmp_alive_batch(
+    ips: &[IpAddr],
+    timeout: Duration,
+    semaphore: &Arc<Semaphore>,
+) -> std::collections::HashSet<IpAddr> {
+    let mut join_set = tokio::task::JoinSet::new();
+    for &ip in ips {
+        if let Ok(permit) = Arc::clone(semaphore).acquire_owned().await {
+            join_set.spawn(async move {
+                let alive = probes::icmp::probe_icmp_echo(ip, timeout).await;
+                drop(permit);
+                (ip, alive)
+            });
+        }
+    }
+    let mut alive_ips = std::collections::HashSet::new();
+    while let Some(res) = join_set.join_next().await {
+        if let Ok((ip, true)) = res {
+            alive_ips.insert(ip);
+        }
+    }
+    alive_ips
+}
+
+/// If a host responded on any port (`Open`, `OpenProtected`, `OpenNoPhp`, or `Closed` via TCP RST),
+/// mark all remaining `Inconclusive` ports on that host as `Closed`.
+pub fn apply_alive_ip_closure(results: &mut [ProbeResult]) {
+    let empty = std::collections::HashSet::new();
+    apply_alive_ip_closure_with_extra(results, &empty);
+}
+
+/// Same as `apply_alive_ip_closure`, also treating `extra_alive` hosts (e.g. ICMP Echo Reply) as UP.
+pub fn apply_alive_ip_closure_with_extra(
+    results: &mut [ProbeResult],
+    extra_alive: &std::collections::HashSet<IpAddr>,
+) {
+    let mut alive_ips = collect_alive_ips(results);
+    alive_ips.extend(extra_alive.iter().copied());
     for r in results.iter_mut() {
         if alive_ips.contains(&r.ip) && r.status == PortStatus::Inconclusive {
             r.status = PortStatus::Closed;
@@ -499,5 +565,42 @@ mod tests {
         assert_eq!(hosts.len(), 4);
         assert_eq!(hosts[0], "fd00::".parse::<IpAddr>().unwrap());
         assert_eq!(hosts[3], "fd00::3".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn test_alive_ip_closure_includes_tcp_rst_and_icmp_hosts() {
+        let tcp_rst_ip: IpAddr = "192.0.2.10".parse().unwrap();
+        let icmp_ip: IpAddr = "192.0.2.20".parse().unwrap();
+        let dead_ip: IpAddr = "192.0.2.30".parse().unwrap();
+
+        let make_res = |ip: IpAddr, port: u16, proto: &str, status: PortStatus| ProbeResult {
+            ip,
+            port,
+            protocol: proto.to_string(),
+            service_name: "SVC".to_string(),
+            description: String::new(),
+            status,
+            response_time_ms: None,
+            timestamp: chrono::Utc::now(),
+        };
+
+        let mut results = vec![
+            make_res(tcp_rst_ip, 4145, "tcp", PortStatus::Closed),
+            make_res(tcp_rst_ip, 37810, "udp", PortStatus::Inconclusive),
+            make_res(icmp_ip, 53, "udp", PortStatus::Inconclusive),
+            make_res(dead_ip, 53, "udp", PortStatus::Inconclusive),
+        ];
+
+        let mut extra_alive = std::collections::HashSet::new();
+        extra_alive.insert(icmp_ip);
+
+        apply_alive_ip_closure_with_extra(&mut results, &extra_alive);
+
+        // Host with TCP RST (Closed) -> remaining Inconclusive UDP ports become Closed
+        assert_eq!(results[1].status, PortStatus::Closed);
+        // Host alive via ICMP Echo -> Inconclusive ports become Closed
+        assert_eq!(results[2].status, PortStatus::Closed);
+        // Host with zero port/ICMP responses -> remains Inconclusive
+        assert_eq!(results[3].status, PortStatus::Inconclusive);
     }
 }

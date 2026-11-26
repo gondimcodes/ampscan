@@ -297,11 +297,21 @@ pub fn validate_udp_response(probe_type: &str, resp: &[u8]) -> bool {
             }
         }
         "mdns" => {
-            // mDNS response: length >= 12, not ICMP reflection, QR bit = 1 (Response)
-            // Note: TXID is not locked per RFC 6762 §18.1
+            // mDNS response: length >= 12, not ICMP reflection, QR = 1 (Response),
+            // Opcode = 0 (Standard Query), RCODE = 0 (NoError), and at least 1 RR (AN/NS/AR).
+            // Note: TXID is not locked per RFC 6762 §18.1.
             if resp.len() >= 12 && !is_ip_reflection_header(resp) {
                 let flags = u16::from_be_bytes([resp[2], resp[3]]);
-                (flags & 0x8000) != 0
+                let is_qr = (flags & 0x8000) != 0;
+                let is_std_query = (flags & 0x7800) == 0;
+                let is_noerror = (flags & 0x000F) == 0;
+                let an_count = u16::from_be_bytes([resp[6], resp[7]]);
+                let ns_count = u16::from_be_bytes([resp[8], resp[9]]);
+                let ar_count = u16::from_be_bytes([resp[10], resp[11]]);
+                is_qr
+                    && is_std_query
+                    && is_noerror
+                    && (an_count > 0 || ns_count > 0 || ar_count > 0)
             } else {
                 false
             }
@@ -410,5 +420,24 @@ mod tests {
             0x30, 0x0C, 0x02, 0x01, 0x01, 0x65, 0x07, 0x0A, 0x01, 0x00, 0x04, 0x00, 0x04, 0x00,
         ];
         assert!(validate_udp_response("ldap", &ok_ldap));
+    }
+
+    #[test]
+    fn test_mdns_validation_rejects_errors_empty_and_accepts_valid_response() {
+        // Non-mDNS / REFUSED (QR=1, RCODE=5) with 1 answer must fail
+        let refused = [0x00, 0x00, 0x84, 0x05, 0, 1, 0, 1, 0, 0, 0, 0];
+        assert!(!validate_udp_response("mdns", &refused));
+
+        // Empty mDNS response (QR=1, NOERROR, 0 answers/authority/additional) must fail
+        let empty = [0x00, 0x00, 0x84, 0x00, 0, 1, 0, 0, 0, 0, 0, 0];
+        assert!(!validate_udp_response("mdns", &empty));
+
+        // Non-standard opcode (Opcode=1, IQUERY) must fail
+        let bad_opcode = [0x00, 0x00, 0x88, 0x00, 0, 1, 0, 1, 0, 0, 0, 0];
+        assert!(!validate_udp_response("mdns", &bad_opcode));
+
+        // Valid mDNS response (arbitrary TXID per RFC 6762 §18.1, QR=1 AA=1, NOERROR, ANCOUNT=1)
+        let valid = [0x02, 0x08, 0x84, 0x00, 0, 1, 0, 1, 0, 0, 0, 0];
+        assert!(validate_udp_response("mdns", &valid));
     }
 }

@@ -4,6 +4,7 @@
 //! and response validation across UDP and TCP services.
 
 pub mod http;
+pub mod icmp;
 pub mod payloads;
 pub mod transport;
 pub mod validate;

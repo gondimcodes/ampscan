@@ -48,6 +48,7 @@ fn print_header() {
 async fn main() -> Result<()> {
     print_header();
     let cli = Cli::parse();
+    ampscan::sys_limits::ensure_root_privileges()?;
 
     match &cli.command {
         Commands::Init => cmd_init(&cli).await,

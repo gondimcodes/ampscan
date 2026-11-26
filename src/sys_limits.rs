@@ -6,6 +6,23 @@ use anyhow::Result;
 #[cfg(unix)]
 use libc::{getrlimit, rlimit, setrlimit, RLIMIT_NOFILE};
 
+/// Ensure the process is running with root privileges (`euid == 0`).
+#[cfg(unix)]
+pub fn ensure_root_privileges() -> Result<()> {
+    if unsafe { libc::geteuid() } != 0 {
+        anyhow::bail!(
+            "AmpScan requires root privileges (euid 0) for ICMP reachability checks and high-concurrency scanning. Please run with 'sudo' or as root."
+        );
+    }
+    Ok(())
+}
+
+/// No-op fallback for non-Unix operating systems.
+#[cfg(not(unix))]
+pub fn ensure_root_privileges() -> Result<()> {
+    Ok(())
+}
+
 /// Attempt to raise the process file descriptor limit (ulimit -n) to match
 /// the requested concurrency (plus some safety overhead).
 #[cfg(unix)]
@@ -83,5 +100,12 @@ mod tests {
         // Try requesting a small concurrency that should easily succeed
         let res = try_raise_fd_limit(10);
         assert!(res.is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_ensure_root_privileges_matches_euid() {
+        let is_root = unsafe { libc::geteuid() } == 0;
+        assert_eq!(ensure_root_privileges().is_ok(), is_root);
     }
 }

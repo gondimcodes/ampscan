@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.7] - 2026-11-26
+
+### Added
+- **Unified Host Reachability & Alive-IP Closure (`CLI` + `TUI`)**:
+  - Added `ensure_root_privileges()` in `src/sys_limits.rs` / `src/main.rs` to abort immediately with a clear error if executed without root privileges (`euid != 0` on Unix).
+  - `apply_alive_ip_closure` now recognizes `PortStatus::Closed` (TCP RST / `ConnectionRefused`) as proof that the host is UP, closing silent UDP ports on that host instead of leaving them `Inconclusive`.
+  - Added post-scan **ICMP Echo (IPv4 & IPv6)** reachability fallback (`src/scanner/probes/icmp.rs`, `SOCK_DGRAM` async with `SOCK_RAW` fallback) exclusively for hosts with 100% `Inconclusive` port results; hosts responding to ICMP Echo are marked `Closed` across both CLI and TUI (`TuiEvent::HostsAlive`). Hosts with zero port and zero ICMP responses remain `Inconclusive`.
+
+### Fixed
+- **mDNS Validator Hardening (`5353/udp`)**:
+  - Updated `validate_udp_response("mdns", ...)` in `src/scanner/probes/validate.rs` to require `QR = 1`, `Opcode = 0`, `RCODE = 0` (`NoError`), and at least one response record (`ANCOUNT + NSCOUNT + ARCOUNT > 0`) while keeping `TXID` unlocked per RFC 6762 §18.1.
+  - Added regression test `test_mdns_validation_rejects_errors_empty_and_accepts_valid_response`.
+- **PDF Manual Verification Commands (`src/report/procedures.rs`)**:
+  - Updated `mDNS` command to include `+norecurse +noedns` (`dig +short +norecurse +noedns -p 5353 @<IP> -t PTR _services._dns-sd._udp.local`), matching `ampscan`'s RFC 6762 probe and avoiding silent drops on strict embedded responders.
+  - Updated `DNS` command from `-t ANY` to `-t A` to match `ampscan`'s `A google.com` probe and avoid RFC 8482 `HINFO` minimal responses.
+  - Updated `DVR-DHCPDiscover` (`37810/udp`) command from bash-specific `echo -ne` to POSIX-portable `printf '\\xff'`.
+
 ## [1.5.6] - 2026-11-26
 
 ### Added

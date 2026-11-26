@@ -37,6 +37,7 @@ impl Tab {
 pub enum TuiEvent {
     ScanStarted(usize),
     ProbeCompleted(ProbeResult),
+    HostsAlive(Vec<std::net::IpAddr>),
     ScanFinished,
     ScanError(String),
 }
@@ -282,6 +283,12 @@ impl App {
     /// Synchronize TUI logs with the scanner's post-scan alive-IP closure rule.
     pub fn apply_alive_ip_closure(&mut self) {
         crate::scanner::apply_alive_ip_closure(&mut self.logs);
+    }
+
+    /// Mark hosts confirmed alive via out-of-band checks (e.g. ICMP Echo) so `Inconclusive` becomes `Closed`.
+    pub fn mark_hosts_alive(&mut self, ips: &[std::net::IpAddr]) {
+        let extra: std::collections::HashSet<std::net::IpAddr> = ips.iter().copied().collect();
+        crate::scanner::apply_alive_ip_closure_with_extra(&mut self.logs, &extra);
     }
 }
 

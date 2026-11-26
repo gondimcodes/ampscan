@@ -82,6 +82,9 @@ pub async fn run_tui(
                         TuiEvent::ProbeCompleted(res) => {
                             app.add_probe_result(res);
                         }
+                        TuiEvent::HostsAlive(ips) => {
+                            app.mark_hosts_alive(&ips);
+                        }
                         TuiEvent::ScanFinished => {
                             app.is_scanning = false;
                             if let Some(start_inst) = app.stats.start_time {
